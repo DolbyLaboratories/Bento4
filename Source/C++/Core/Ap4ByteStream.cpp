@@ -101,6 +101,20 @@ AP4_ByteStream::WriteString(const char* buffer)
 }
 
 /*----------------------------------------------------------------------
+|   AP4_ByteStream::WriteString
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_ByteStream::WriteNullTerminatedString(const char* buffer)
+{
+    // write the string
+    AP4_Result result = WriteString(buffer);
+    if (AP4_FAILED(result)) return result;
+
+    // write the NUL termination
+    return WriteUI08('\0');
+}
+
+/*----------------------------------------------------------------------
 |   AP4_ByteStream::WriteDouble
 +---------------------------------------------------------------------*/
 AP4_Result

@@ -52,7 +52,14 @@ const unsigned int AP4_MUX_READ_BUFFER_SIZE         = 65536;
 +---------------------------------------------------------------------*/
 static struct {
     bool verbose;
+    bool preselection;
 } Options;
+// Global track list, for Preselections
+AP4_ContainerAtom*  tkgd = NULL;
+AP4_Flags           track_group_id_auto = true;
+AP4_UI32            track_group_id = 1; // Start at 1
+AP4_Cardinal        preselection_index = 0; // Number of preselections
+AP4_Cardinal        pres_param_index = 0; // Next preselection-type parameter within track parameters
 
 /*----------------------------------------------------------------------
 |   SampleOrder
@@ -114,11 +121,37 @@ PrintUsageAndExit()
             "\n"
             "Common optional parameters for all types:\n"
             "  language: language code (3-character ISO 639-2 Alpha-3 code)\n"
+            "  label: description of the track\n"
+            "    optionally, prepend label's language, separated with ':' (default='en-US')\n"
+            "    language is a IETF BCP 47 compliant language tag string\n"
+            "    multiple label parameter per track are supported\n"
+            "  pres: Preselection info, one for each presentation of the track\n"
+            "    optional parameter values, separated by '/', e.g., 'id1/sp2/so1/to2/sm'\n"
+            "      skip: skip this preselection (no further parameters)\n"
+            "      tag<name>: preselection tag (unique ID)\n"
+            "      id<x>: track group ID, to group multiple tracks into a preselection\n"
+            "        if specified, specify for all preselections\n"
+            "      to<x>: track order\n"
+            "      sm: sample merge (set on 2nd and subsequent track)\n"
+            "      sp<x>: selection priority, 0=highest\n"
+            "      so<x>: segment order (x=0..2)\n"
+            "        0=undefined, 1=time ordered, 2=fully ordered\n"
+            "    Followed by any of:\n"
+            "      pres_label: description of preselection (see 'label' parameter above)\n"
+            "        multiple entries, e.g, in different languages, are supported\n"
+            "      pres_lang: main language of this preselection, IETF BCP 47 compliant language tag,\n"
+            "        e.g., 'en-US' (default: auto, from stream)\n"
+            "      pres_kind: DASH-Role of preselection (main, dub, etc.) (default: auto, from stream)\n"
+            "        optionally, prepend role's URN, separated with <space> (default: 'urn:mpeg:dash:role:2011')\n"
+            "      pres_render: audio rendering indication, 0..4 (default: auto, from stream)\n"
+            "        0=no pref, 1=stereo, 2=surround, 3=spatial, 4=headphones\n"
             "\n"
             "If no type is specified for an input, the type will be inferred from the file extension\n"
             "\n"
             "Options:\n"
-            "  --verbose: show more details\n");
+            "  --verbose: show more details\n"
+            "  --preselection: add preselection information\n"
+            "      combine with 'pres' parameters for each track involved\n");
     exit(1);
 }
 
@@ -307,6 +340,263 @@ CheckDoviInputParameters(AP4_Array<Parameter>& parameters)
     }
 
     return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   GetLabl (Labl atom from parameter)
++---------------------------------------------------------------------*/
+static AP4_LablAtom*
+GetLabl(AP4_Flags   is_group_label,
+        AP4_UI16    label_id,
+        const char* default_lang,
+        AP4_String param)
+{
+    // Assemble LABL atom
+    AP4_String label = NULL;
+    AP4_String label_lang = default_lang; // E.g., "en-US"
+    int colon = param.Find(':');
+    if (colon >= 0) {
+        label_lang.Assign(param.GetChars(), colon);
+        label = param.GetChars()+colon+1;
+    } else {
+        label = param;
+    }
+    return new AP4_LablAtom(is_group_label, label_id, label_lang.GetChars(), label.GetChars());
+}
+
+/*----------------------------------------------------------------------
+|   AddUdtaChild (Add atom inside UDTA atom)
++---------------------------------------------------------------------*/
+static AP4_Result
+AddUdtaChild(AP4_ContainerAtom* parent, AP4_Atom* child)
+{
+    // Find or create UDTA atom in parent
+    AP4_ContainerAtom* udta = NULL;
+    AP4_Atom* atom = parent->FindChild("udta");
+    if (atom == NULL) {
+        udta = new AP4_ContainerAtom(AP4_ATOM_TYPE_UDTA);
+        parent->AddChild(udta);
+    } else {
+        udta = (AP4_ContainerAtom*)atom;
+    }
+    udta->AddChild(child);
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   ApplyTrackParams (informative atoms)
++---------------------------------------------------------------------*/
+static AP4_Result
+ApplyTrackParams(AP4_Track* track, AP4_Array<Parameter>& parameters)
+{
+    // Parse track params
+    for (unsigned int i=0; i<parameters.ItemCount(); i++) {
+        if (parameters[i].m_Name == "label") {
+            AP4_String& param = parameters[i].m_Value;
+            AP4_LablAtom* labl = GetLabl(false, 0, "en-US", param);
+            AddUdtaChild(track->UseTrakAtom(), labl);
+        }
+    }
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   ApplyTrackPreselectionParams (preselection atoms)
+|   Adds PRES/PRSP to TRGR, returns PRSE added to/found in global TRGD
++---------------------------------------------------------------------*/
+static AP4_PrseAtom*
+ApplyTrackPreselectionParams(AP4_ContainerAtom* trgr, const char* default_tag, AP4_Array<Parameter>& parameters)
+{
+    // PRSP options
+    AP4_Flags   prsp_needed = false;
+    AP4_UI08    track_order = 0;
+    AP4_Flags   sample_merge_flag = false;
+    // PRSE options
+    char*       preselection_tag = NULL;
+    AP4_UI08    num_tracks = 1;
+    AP4_Flags   selection_priority_present = false;
+    AP4_UI08    selection_priority = 0;
+    AP4_Flags   segment_order_present = false;
+    AP4_UI08    segment_order = 0;
+    
+    if (tkgd == NULL) return NULL; // Global TKGD is missing!
+    
+    // Find next 'pres' parameter (if any) in track parameters
+    while ((pres_param_index < parameters.ItemCount()) && (parameters[pres_param_index].m_Name != "pres")) {
+        pres_param_index++;
+    }
+    
+    // Parse 'pres' parameter
+    AP4_Flags track_group_id_given = false;
+    if (pres_param_index >= parameters.ItemCount()) {
+        // No 'pres' parameter found, do not add preselection
+        return NULL;
+    } else {
+        AP4_String& param = parameters[pres_param_index].m_Value;
+        AP4_String pres_opt = NULL;
+        AP4_String pres_opt_next = NULL;
+        // Parse param into above option variables
+        int slash;
+
+        do {
+            slash = param.Find('/');
+            if (slash >= 0) {
+                pres_opt.Assign(param.GetChars(), slash);
+                pres_opt_next = param.GetChars()+slash+1;
+            } else {
+                pres_opt = param;
+            }
+            AP4_String tag = NULL;
+            AP4_String val = NULL;
+            AP4_UI08 num = 0;
+            if (! strncmp("skip", pres_opt.GetChars(), 4))
+            {
+                // Instructed to skip preselection for this entry
+                return NULL;
+            } else
+            if (! strncmp("tag", pres_opt.GetChars(), 3))
+            {
+                val = pres_opt.GetChars()+3;
+                preselection_tag = new char[val.GetLength()+1];
+                strncpy(preselection_tag, val.GetChars(), val.GetLength()+1);
+            } else
+            {
+                // 1st two chars = tag, remainder is value
+                tag.Assign(pres_opt.GetChars(), 2);
+                val = pres_opt.GetChars()+2;
+                num = atoi(val.GetChars());
+                if (! strncmp("id", tag.GetChars(), 2)) {
+                    if (track_group_id_auto && (preselection_index > 0)) {
+                        fprintf(stderr, "ERROR: track group ID must be specified for all presentations!\n");
+                        return NULL;
+                    }
+                    track_group_id_given = true;
+                    track_group_id_auto = false;
+                    track_group_id = num;
+                } else if (! strncmp("to", tag.GetChars(), 2)) {
+                    prsp_needed = true;
+                    track_order = num;
+                } else if (! strncmp("sm", tag.GetChars(), 2)) {
+                    prsp_needed = true;
+                    sample_merge_flag = true;
+                } else if (! strncmp("sp", tag.GetChars(), 2)) {
+                    selection_priority_present = true;
+                    selection_priority = num;
+                } else if (! strncmp("so", tag.GetChars(), 2)) {
+                    if ((num >= 0) && (num <= 2)) {
+                        segment_order_present = true;
+                        segment_order = num;
+                    } else {
+                        fprintf(stderr, "ERROR: segment order must be in the range 0 to 2\n");
+                    }
+                }
+            }
+            param = pres_opt_next;
+        } while (slash >= 0);
+        pres_param_index++;
+    }
+    if ((! track_group_id_auto) && (! track_group_id_given)) {
+        fprintf(stderr, "ERROR: track group ID must be specified for all presentations!\n");
+        return NULL;
+    }
+
+    // Add PRES and PRSP atoms to TRGR in TRAK for this presentation
+    AP4_PresAtom* pres = new AP4_PresAtom(track_group_id);
+    if (pres == NULL) return NULL;
+    if (prsp_needed) {
+        AP4_PrspAtom* prsp = new AP4_PrspAtom(track_order, sample_merge_flag);
+        if (prsp == NULL) return NULL;
+        pres->AddChild(prsp);
+    }
+    trgr->AddChild(pres);
+
+    // Add this track's preselection info to global Track Group Description atom
+    // PRSE in TKGD is linked to PRES in track's TRGR by the track_group_id
+
+    // Search for existing Preselection Entry atom with same ID
+    if (! track_group_id_auto) { // only applicable if ID is given for multiple tracks
+        AP4_List<AP4_Atom>::Item* list_item = tkgd->GetChildren().FirstItem();
+        while (list_item) {
+            AP4_Atom* atom = list_item->GetData();
+            AP4_PrseAtom* prse = AP4_DYNAMIC_CAST(AP4_PrseAtom, atom);
+            if (prse && (prse->GetTrackGroupID() == track_group_id)) {
+                // Increment track count
+                prse->SetNumTracks(prse->GetNumTracks() + 1);
+                // Bail, everything else has already been done the first time around
+                return prse;
+            }
+            list_item = list_item->GetNext();
+        }
+    }
+
+    // Create Preselection Entry atom
+    AP4_PrseAtom* prse = new AP4_PrseAtom(
+                                          track_group_id,
+                                          num_tracks,
+                                          (preselection_tag) ? preselection_tag : default_tag,
+                                          selection_priority_present,
+                                          selection_priority,
+                                          segment_order_present,
+                                          segment_order);
+    if (preselection_tag) {
+        delete[] preselection_tag;
+    }
+    if (prse == NULL) return NULL;
+    
+    // Add group label to 1st PRSE, indicating these are Preselections
+    if (preselection_index == 0) {
+        AP4_LablAtom* labl_pres = new AP4_LablAtom(true, 1, "en", "Preselections");
+        prse->AddChild(labl_pres);
+    }
+    
+    // Look for other parameters ahead of next 'pres' parameter
+    while ((pres_param_index < parameters.ItemCount()) && (parameters[pres_param_index].m_Name != "pres"))
+    {
+        if (parameters[pres_param_index].m_Name == "pres_label") {
+            AP4_String& param = parameters[pres_param_index].m_Value;
+            AP4_LablAtom* labl = GetLabl(false, 1, "en-US", param);
+            prse->AddChild(labl);
+        } else if (parameters[pres_param_index].m_Name == "pres_lang") {
+            AP4_String& param = parameters[pres_param_index].m_Value;
+            AP4_ElngAtom* elng = new AP4_ElngAtom(param.GetChars());
+            prse->AddChild(elng);
+        } else if (parameters[pres_param_index].m_Name == "pres_kind") {
+            AP4_String& param = parameters[pres_param_index].m_Value;
+            AP4_String pres_kind = NULL;
+            AP4_String pres_kind_urn = "urn:mpeg:dash:role:2011";
+            int colon = param.Find(' ');
+            if (colon >= 0) {
+                pres_kind_urn.Assign(param.GetChars(), colon);
+                pres_kind = param.GetChars()+colon+1;
+            } else {
+                pres_kind = param;
+            }
+            AP4_KindAtom* kind = new AP4_KindAtom(pres_kind_urn.GetChars(), pres_kind.GetChars());
+            prse->AddChild(kind);
+        } else if (parameters[pres_param_index].m_Name == "pres_render") {
+            const char* param = parameters[pres_param_index].m_Value.GetChars();
+            if ((strlen(param) != 1) || (param[0] < '0') || (param[0] > '4'))
+            {
+                fprintf(stderr, "ERROR: audio rendering indication must be in the range 0 to 4\n");
+            } else {
+                AP4_UI08 audio_rendering_indication = param[0]-'0';
+                AP4_ArdiAtom* ardi = new AP4_ArdiAtom(audio_rendering_indication);
+                prse->AddChild(ardi);
+            }
+        }
+        pres_param_index++;
+    }
+
+    // Add PRSE to track group description and increment track counter
+    tkgd->AddChild(prse);
+    preselection_index++;
+    if (track_group_id_auto) {
+        track_group_id++;
+    }
+
+    return prse; // return PRSE for further processing
 }
 
 /*----------------------------------------------------------------------
@@ -536,6 +826,15 @@ AddAacTrack(AP4_Movie&            movie,
                                      language,          // language
                                      0, 0);             // width, height
 
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "aac", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
+
     // cleanup
     input->Release();
 
@@ -674,6 +973,15 @@ AddAc3Track(AP4_Movie&             movie,
         new_edts->AddChild(new_elst);
         track->UseTrakAtom()->AddChild(new_edts, 1);
     }
+
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "ac3", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
 
     // cleanup
     input->Release();
@@ -822,6 +1130,15 @@ AddEac3Track(AP4_Movie&             movie,
         track->UseTrakAtom()->AddChild(new_edts, 1);
     }
 
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "eac3", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
+
     // cleanup
     input->Release();
 
@@ -850,6 +1167,9 @@ AddAc4Track(AP4_Movie&            movie,
 
     // create a sample table
     AP4_SyntheticSampleTable* sample_table = new AP4_SyntheticSampleTable(); // The parameter chunk_size is used to control chunk size in 'stsc' box
+
+    // Preselection info
+    AP4_ContainerAtom* trgr = NULL;
 
     // create an AC-4 Sync Frame parser
     AP4_Ac4Parser parser;
@@ -893,6 +1213,262 @@ AddAc4Track(AP4_Movie&            movie,
                 sample_duration  = frame.m_Info.m_SampleDuration;
                 media_time_scale = frame.m_Info.m_MediaTimeScale;
 
+                if (Options.verbose) {
+                    printf("AC-4 info: n_pres = %u\n",
+                           frame.m_Info.m_Ac4Dsi.d.v1.n_presentations);
+                    for (unsigned int presentation = 0; presentation < frame.m_Info.m_Ac4Dsi.d.v1.n_presentations; presentation++)
+                    {
+                        printf("AC-4 pres[%u]: id = %u:%u, pres_v1 = 0x%X, pres_ch_mode = %u, hp = %u, ch_mask = 0x%X n_sub = %u\n",
+                               presentation,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.b_presentation_id,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_id,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_config_v1,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.dsi_presentation_ch_mode,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.b_pre_virtualized,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_channel_mask_v1,
+                               frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.n_substream_groups);
+                        for (unsigned int substream = 0; substream < frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.n_substream_groups; substream++)
+                        {
+                            printf("AC-4 pres[%u] sub[%u]: lang = %u:%u:%s, cont = %u:%u\n",
+                                   presentation,
+                                   substream,
+                                   frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.b_language_indicator,
+                                   frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.n_language_tag_bytes,
+                                   frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.language_tag_bytes,
+                                   frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.b_content_type,
+                                   frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.content_classifier);
+                        }
+                    }
+                }
+                
+                // Preselections: Adding presentations to Track Group
+                if (Options.preselection) {
+                    // Create TRGR atom
+                    trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+
+                    // Apply one Preselection for each Presentation
+                    for (unsigned int presentation = 0; presentation < frame.m_Info.m_Ac4Dsi.d.v1.n_presentations; presentation++)
+                    {
+                        // Generate preselection_tag from presentation_id in DSI
+                        char* tag = new char[4];
+                        if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.b_presentation_id)
+                        {
+                            sprintf(tag, "%u", frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_id);
+                        } else {
+                            sprintf(tag, "%u", 0);
+                        }
+                        
+                        // Add PRES/PRSP to TRGR, retrieve PRSE added to global TRGD
+                        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, (const char*)tag, parameters);
+                        
+                        // Fill from DSI, unless overridden by explicit pres_... parameter
+                        if (prse) {
+                            
+                            // Extract language for ELNG atom from DSI, if not already present
+                            if (! prse->FindChild("elng")) {
+                                // Second substream for conf 0 or 3, first otherwise
+                                unsigned int substream = 0;
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.n_substream_groups > 1)
+                                {
+                                    switch (
+                                            frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_config_v1)
+                                    {
+                                        case 0:
+                                        case 3:
+                                            substream = 1;
+                                            break;
+                                    }
+                                }
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.b_language_indicator)
+                                {
+                                    char* extended_language = new char[64];
+                                    strncat(
+                                            extended_language,
+                                            (const char*)frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.language_tag_bytes,
+                                            frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.n_language_tag_bytes);
+                                    AP4_ElngAtom* elng = new AP4_ElngAtom(extended_language);
+                                    prse->AddChild(elng);
+                                }
+                            }
+
+                            // Determine ARDI atom from DSI, if not already present
+                            if (! prse->FindChild("ardi")) {
+                                AP4_UI08 audio_rendering_indication = 0; // No preference
+                                // Not channels, i.e., dynamic objects / ambisonics?
+                                if (! frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.b_presentation_channel_coded)
+                                {
+                                    audio_rendering_indication = 3;  // Spatial objects
+                                } else
+                                // Pre-virtualized Headphone Mix?
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.b_pre_virtualized)
+                                {
+                                    audio_rendering_indication = 4; // Headphones
+                                } else
+                                // Check channel mode
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.dsi_presentation_ch_mode <= 1)
+                                {
+                                    audio_rendering_indication = 1; // Mono or Stereo
+                                } else if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.dsi_presentation_ch_mode <= 8)
+                                {
+                                    audio_rendering_indication = 2;  // 3.0 through 7.1
+                                } else if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.dsi_presentation_ch_mode <= 15)
+                                {
+                                    audio_rendering_indication = 3;  // 5.0.2 through 9.1.4 and 22.2
+                                } else
+                                // Check channel mask
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_channel_mask_v1 & 0x0EEB0)
+                                {
+                                    audio_rendering_indication = 3;  // Has verticals
+                                } else if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_channel_mask_v1 & 0x0000C)
+                                {
+                                    audio_rendering_indication = 2;  // Has surrounds
+                                } else if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_channel_mask_v1 & 0x30003)
+                                {
+                                    audio_rendering_indication = 1;  // Has fronts
+                                }
+                                AP4_ArdiAtom* ardi = new AP4_ArdiAtom(audio_rendering_indication);
+                                prse->AddChild(ardi);
+                            }
+
+                            // Determine KIND atom from DSI, if not already present
+                            if (! prse->FindChild("kind")) {
+                                /* Kind value: Use IEC 23009-1 (DASH) "Role", see Section 5.8.5.5 and Table 34 */
+                                static const char* dash_urn = "urn:mpeg:dash:role:2011";
+                                enum dash_role_entry {
+                                    dr_caption,
+                                    dr_subtitle,
+                                    dr_main,
+                                    dr_alternate,
+                                    dr_supplementary,
+                                    dr_commentary,
+                                    dr_dub,
+                                    dr_description,
+                                    dr_sign,
+                                    dr_metadata,
+                                    dr_enhanced_audio_intelligibility,
+                                    dr_emergency,
+                                    dr_forced_subtitle,
+                                    dr_easyreader,
+                                    dr_karaoke
+                                };
+                                static const char* dash_role[] = {
+                                    "caption", "subtitle", "main", "alternate",
+                                    "supplementary", "commentary", "dub", "description",
+                                    "sign", "metadata", "enhanced-audio-intelligibility",
+                                    "emergency", "forced-subtitle", "easyreader", "karaoke"
+                                };
+                                const char* dash_role_select = dash_role[dr_main]; // default
+                                // Select associated audio: 2nd substream for conf 2, 3rd for 3 or 4, search for 5, use first otherwise
+                                unsigned int substream = 0;
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.n_substream_groups > 1)
+                                {
+                                    switch (
+                                            frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.presentation_config_v1)
+                                    {
+                                        case 2:
+                                            substream = 1;
+                                            break;
+                                        case 3:
+                                        case 4:
+                                            substream = 2;
+                                            break;
+                                        case 5:
+                                            for (int i = 0; i < frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.n_substream_groups; i++)
+                                            {
+                                                int done = false;
+                                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[i].d.v1.b_content_type)
+                                                {
+                                                    AP4_UI08 content_classifier = frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[i].d.v1.content_classifier;
+                                                    switch (content_classifier)
+                                                    {
+                                                        case 2:
+                                                        case 3:
+                                                        case 5:
+                                                        case 6:
+                                                        case 7:
+                                                            substream = i;
+                                                            done = true;
+                                                            break;
+                                                    }
+                                                }
+                                                if (done) break;
+                                            }
+                                            break;
+                                    }
+                                }
+                                char* lang_tag = new char[64];
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.b_language_indicator)
+                                {
+                                    strncat(
+                                            lang_tag,
+                                            (const char*)frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.language_tag_bytes,
+                                            frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.n_language_tag_bytes);
+                                } else {
+                                    lang_tag[0] = '\0';
+                                }
+                                if (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.b_content_type)
+                                {
+                                    switch (frame.m_Info.m_Ac4Dsi.d.v1.presentations[presentation].d.v1.substream_groups[substream].d.v1.content_classifier)
+                                    {
+                                        case 2: // visually impaired
+                                            // Audio Description with Spoken Subtitles
+                                            if (
+                                                (! strncmp("qas", lang_tag, 3))
+                                                ||
+                                                (! strncmp("qtx", lang_tag, 3))
+                                                )
+                                            {
+                                                dash_role_select = dash_role[dr_description];
+                                            } else
+                                            // Audio Description
+                                            if (
+                                                (! strncmp("qad", lang_tag, 3))
+                                                ||
+                                                (! strncmp("qax", lang_tag, 3))
+                                               )
+                                            {
+                                                dash_role_select = dash_role[dr_description];
+                                            } else
+                                            // Audio Emergency Information
+                                            if (
+                                                (! strncmp("qei", lang_tag, 3))
+                                                ||
+                                                (! strncmp("qex", lang_tag, 3))
+                                               )
+                                            {
+                                                dash_role_select = dash_role[dr_emergency];
+                                            }
+                                            break;
+                                        case 3: // hearing impaired
+                                            dash_role_select = dash_role[dr_enhanced_audio_intelligibility];
+                                            break;
+                                        case 5: // commentary
+                                            dash_role_select = dash_role[dr_commentary];
+                                            break;
+                                        case 6: // emergency
+                                            dash_role_select = dash_role[dr_emergency];
+                                            break;
+                                        case 7: // voice over
+                                            // Spoken Subtitles
+                                            if (
+                                                (! strncmp("qss", lang_tag, 3))
+                                                ||
+                                                (! strncmp("qsx", lang_tag, 3))
+                                               )
+                                            {
+                                                dash_role_select = dash_role[dr_description];
+                                            } else {
+                                                dash_role_select = dash_role[dr_commentary];
+                                            }
+                                            break;
+                                    }
+                                }
+                                AP4_KindAtom* kind = new AP4_KindAtom(dash_urn, dash_role_select);
+                                prse->AddChild(kind);
+                            }
+                        }
+                    }
+                }
             }
 
             // read and store the sample data
@@ -969,6 +1545,13 @@ AddAc4Track(AP4_Movie&            movie,
         new_edts->AddChild(new_elst);
         track->UseTrakAtom()->AddChild(new_edts, 1);
     }
+
+    // Preselections: Adding Track Group
+    if (trgr) {
+        track->UseTrakAtom()->AddChild(trgr);
+    }
+    
+    ApplyTrackParams(track, parameters);
 
     // cleanup
     input->Release();
@@ -1202,6 +1785,15 @@ AddH264Track(AP4_Movie&            movie,
     }
     // update the brands list
     brands.Append(AP4_FILE_BRAND_AVC1);
+
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "h264", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
 
     // cleanup
     input->Release();
@@ -1487,6 +2079,15 @@ AddH264DoviTrack(AP4_Movie&            movie,
     // update the brands list
     brands.Append(format);
 
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "h264dv", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
+
     // cleanup
     input->Release();
 
@@ -1764,6 +2365,15 @@ AddH265Track(AP4_Movie&            movie,
     }
     // update the brands list
     brands.Append(AP4_FILE_BRAND_HVC1);
+
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "h265", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
 
     // cleanup
     input->Release();
@@ -2109,6 +2719,15 @@ AddH265DoviTrack(AP4_Movie&           movie,
         }
     }
 
+    if (Options.preselection) {
+        AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+        AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "h265dv", parameters);
+        if (prse) {
+            track->UseTrakAtom()->AddChild(trgr);
+        }
+    }
+    ApplyTrackParams(track, parameters);
+
     // cleanup
     input->Release();
 
@@ -2196,6 +2815,17 @@ AddMp4Tracks(AP4_Movie&            movie,
                 track->SetTrackLanguage(language);
             }
 
+            // one 'pres' parameter per track
+            if (Options.preselection) {
+                AP4_ContainerAtom* trgr = new AP4_ContainerAtom(AP4_ATOM_TYPE_TRGR);
+                AP4_PrseAtom* prse = ApplyTrackPreselectionParams(trgr, "mp4", parameters);
+                if (prse) {
+                    track->UseTrakAtom()->AddChild(trgr);
+                }
+            }
+            // for now, same for all tracks
+            ApplyTrackParams(track, parameters);
+
             movie.AddTrack(track);
         }
         track_item = track_item->GetNext();
@@ -2212,6 +2842,7 @@ main(int argc, char** argv)
         PrintUsageAndExit();
     }
     Options.verbose = false;
+    Options.preselection = false;
     
     const char* output_filename = NULL;
     AP4_Array<char*> input_names;
@@ -2219,6 +2850,8 @@ main(int argc, char** argv)
     while (char* arg = *++argv) {
         if (!strcmp(arg, "--verbose")) {
             Options.verbose = true;
+        } else if (!strcmp(arg, "--preselection")) {
+            Options.preselection = true;
         } else if (!strcmp(arg, "--track")) {
             input_names.Append(*++argv);
         } else if (output_filename == NULL) {
@@ -2246,6 +2879,11 @@ main(int argc, char** argv)
         creation_time = (AP4_UI64)now + 0x7C25B080;
     }
     AP4_Movie* movie = new AP4_Movie(0, 0, creation_time, creation_time);
+
+    // Set up Track Group Description for Preselections
+    if (Options.preselection) {
+        tkgd = new AP4_ContainerAtom(AP4_ATOM_TYPE_TKGD);
+    }
 
     // setup the brands
     AP4_Array<AP4_UI32> brands;
@@ -2315,6 +2953,7 @@ main(int argc, char** argv)
         if (input_params) {
             ParseParameters(input_params, parameters);
         }
+        pres_param_index = 0; // Reset preselection parameter pointer
 
         bool isDovi = false;
         for (unsigned int i=0; i<parameters.ItemCount(); i++) {
@@ -2388,6 +3027,12 @@ main(int argc, char** argv)
     }
 
     movie->GetMvhdAtom()->SetNextTrackId(movie->GetTracks().ItemCount() + 1);
+    
+    // Preselections: Adding Track Group Description
+    if (preselection_index > 0) {
+        AP4_MoovAtom* moov = movie->GetMoovAtom();
+        moov->AddChild(tkgd);
+    }
 
     // open the output
     AP4_ByteStream* output = NULL;
