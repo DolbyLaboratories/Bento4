@@ -184,8 +184,8 @@ AP4_Ac4Header::~AP4_Ac4Header()
         assert(m_PresentationV1 != NULL);
         for (unsigned int pres_idx = 0; pres_idx < m_NPresentations; pres_idx++) {
             assert(m_PresentationV1[pres_idx].d.v1.substream_groups != NULL);
-            for (int j = 0; j < m_PresentationV1[pres_idx].d.v1.n_substream_groups; j++)
-                delete[] m_PresentationV1[pres_idx].d.v1.substream_groups[j].d.v1.substreams;
+            //for (int j = 0; j < m_PresentationV1[pres_idx].d.v1.n_substream_groups; j++)
+            //    delete[] m_PresentationV1[pres_idx].d.v1.substream_groups[j].d.v1.substreams;
             delete[] m_PresentationV1[pres_idx].d.v1.substream_groups;
             delete[] m_PresentationV1[pres_idx].d.v1.substream_group_indexs;
         }
@@ -458,7 +458,8 @@ AP4_Ac4Parser::FindFrame(AP4_Ac4Frame& frame)
             m_Bits.SkipBytes(sync_frame_size + next_sync_frame_size);
             goto fail;
         }
-    } else if (available < (ac4_header.m_FrameSize + ac4_header.m_HeaderSize + ac4_header.m_CrcSize) || (m_Bits.m_Flags & AP4_BITSTREAM_FLAG_EOS) == 0) {
+    }
+    else if (available < (ac4_header.m_FrameSize + ac4_header.m_HeaderSize + ac4_header.m_CrcSize) || (m_Bits.m_Flags & AP4_BITSTREAM_FLAG_EOS) == 0) {
         // not enough for a frame, or not at the end (in which case we'll want to peek at the next header)
         return AP4_ERROR_NOT_ENOUGH_DATA;
     }
@@ -494,7 +495,23 @@ AP4_Ac4Parser::FindFrame(AP4_Ac4Frame& frame)
     frame.m_Info.m_Ac4Dsi.d.v1.ac4_bitrate_dsi.bit_rate = 0;                    // unknown, fixed value now
     frame.m_Info.m_Ac4Dsi.d.v1.ac4_bitrate_dsi.bit_rate_precision = 0xffffffff; // unknown, fixed value now
     frame.m_Info.m_Ac4Dsi.d.v1.n_presentations = ac4_header.m_NPresentations;
-    frame.m_Info.m_Ac4Dsi.d.v1.presentations   = ac4_header.m_PresentationV1;
+    //frame.m_Info.m_Ac4Dsi.d.v1.presentations   = ac4_header.m_PresentationV1;
+    frame.m_Info.m_Ac4Dsi.d.v1.presentations   = new AP4_Dac4Atom::Ac4Dsi::PresentationV1[ac4_header.m_NPresentations];
+    AP4_CopyMemory(frame.m_Info.m_Ac4Dsi.d.v1.presentations,
+                   ac4_header.m_PresentationV1,
+                   ac4_header.m_NPresentations * sizeof(ac4_header.m_PresentationV1[0]));
+    //frame.m_Info.m_Ac4Dsi.d.v1.presentations->d.v1.substream_groups
+    //AP4_Dac4Atom::Ac4Dsi::PresentationV1 presentations = new AP4_Dac4Atom::Ac4Dsi::PresentationV1
+
+    for (unsigned int pres_idx = 0; pres_idx < ac4_header.m_NPresentations; pres_idx++) {
+        frame.m_Info.m_Ac4Dsi.d.v1.presentations[pres_idx].d.v1.substream_groups =
+            new AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1[ac4_header.m_PresentationV1[pres_idx].d.v1.n_substream_groups];
+        AP4_CopyMemory(frame.m_Info.m_Ac4Dsi.d.v1.presentations[pres_idx].d.v1.substream_groups,
+                       ac4_header.m_PresentationV1[pres_idx].d.v1.substream_groups,
+                       ac4_header.m_PresentationV1[pres_idx].d.v1.n_substream_groups * sizeof(ac4_header.m_PresentationV1[pres_idx].d.v1.substream_groups[0]));
+    }
+
+
 
     /* set the frame source */
     frame.m_Source = &m_Bits;
