@@ -64,7 +64,7 @@ from mp4utils import (
 
 # setup main options
 VERSION = "2.0.0"
-SDK_REVISION = '639'
+SDK_REVISION = '640'
 SCRIPT_PATH = path.abspath(path.dirname(__file__))
 sys.path += [SCRIPT_PATH]
 
@@ -462,7 +462,7 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
             AddDescriptor(adaptation_set, set_attributes, 'video', None)
 
             # setup content protection
-            if options.encryption_key or options.marlin or options.playready or options.widevine:
+            if options.encryption_key or options.eme_signaling or options.marlin or options.playready or options.widevine or options.clearkey or options.primetime:
                 AddContentProtection(options, adaptation_set, video_tracks, all_audio_tracks + all_video_tracks)
 
             if options.on_demand:
@@ -519,7 +519,7 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
             AddDescriptor(adaptation_set, set_attributes, 'audio/' + language, 'audio')
 
             # setup content protection
-            if options.encryption_key or options.marlin or options.playready or options.widevine:
+            if options.encryption_key or options.eme_signaling or options.marlin or options.playready or options.widevine or options.clearkey or options.primetime:
                 AddContentProtection(options, adaptation_set, audio_tracks, all_audio_tracks + all_video_tracks)
 
             if options.on_demand:
@@ -558,12 +558,7 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                     else:
                         scheme_id_uri = DOLBY_AC4_AUDIO_CHANNEL_CONFIGURATION_SCHEME_ID_URI
                 else:
-                    # detect the actual number of channels
-                    sample_description = audio_track.info['sample_descriptions'][0]
-                    if 'mpeg_4_audio_decoder_config' in sample_description:
-                        audio_channel_config_value = str(sample_description['mpeg_4_audio_decoder_config']['channels'])
-                    else:
-                        audio_channel_config_value = str(audio_track.channels)
+                    audio_channel_config_value = str(audio_track.channels)
                     scheme_id_uri = MPEG_DASH_AUDIO_CHANNEL_CONFIGURATION_SCHEME_ID_URI if options.use_legacy_audio_channel_config_uri else ISO_IEC_23001_8_AUDIO_CHANNEL_CONFIGURATION_SCHEME_ID_URI
                 xml.SubElement(representation,
                                'AudioChannelConfiguration',
@@ -939,7 +934,8 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                 default = not default_selected
             if default:
                 default_selected = True
-            master_playlist_file.write('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="{}",LANGUAGE="{}",NAME="{}",AUTOSELECT={},DEFAULT={},CHANNELS="{}",URI="{}"\n'.format(
+            
+            master_playlist_file.write('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="{}",LANGUAGE="{}",NAME="{}",AUTOSELECT={},DEFAULT={},CHANNELS="{}",URI="{}"'.format(
                                        audio_group_name,
                                        audio_track.language,
                                        media_name,
@@ -947,6 +943,13 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                                        'YES' if default else 'NO',
                                        audio_track.channels,
                                        media_playlist_path))
+            
+            hls_characteristic = audio_track.hls_characteristic
+            if hls_characteristic != None:
+                master_playlist_file.write(',CHARACTERISTIC="{}"'.format(hls_characteristic))
+
+            master_playlist_file.write("\n")
+
             OutputHlsTrack(options, audio_track, all_audio_tracks + all_video_tracks, media_subdir, media_playlist_name, media_file_name)
 
             # Add an audio stream entry for audio-only presentations or if the track specifiers include a '-' entry
@@ -1032,8 +1035,10 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                                      video_track.width,
                                      video_track.height,
                                      iframes_playlist_path))
+
         if supplemental_codec_string != '':
-            iframe_playlist_lines.append(',SUPPLEMENTAL-CODECS="{}"\n'.format(supplemental_codec_string))
+            iframe_playlist_lines.append(',SUPPLEMENTAL-CODECS="{}"'.format(supplemental_codec_string))
+        iframe_playlist_lines.append('\n')
 
     master_playlist_file.write('\n# I-Frame Playlists\n')
     master_playlist_file.write(''.join(iframe_playlist_lines))
@@ -1420,6 +1425,7 @@ def SelectTracks(options, media_sources):
             track.hls_autoselect = BooleanFromString(media_source.spec.get('+hls_autoselect', 'YES'))
             track.hls_group = media_source.spec.get('+hls_group')
             track.hls_group_match = media_source.spec.get('+hls_group_match', '*').split('&')
+            track.hls_characteristic = media_source.spec.get('+hls_characteristic')
 
         # update label indexes (so that we can use numbers instead of strings for labels)
         for track in tracks:
