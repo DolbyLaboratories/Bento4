@@ -992,7 +992,7 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                 if '*' not in video_track.hls_group_match and audio_group_name not in video_track.hls_group_match:
                     continue
                 audio_codecs = ','.join(audio_groups[audio_group_name]['codecs'])
-                master_playlist_file.write('#EXT-X-STREAM-INF:{}AUDIO="{}",AVERAGE-BANDWIDTH={:.0f},BANDWIDTH={:.0f},VIDEO-RANGE={},CODECS="{}",RESOLUTION={:.0f}x{:.0f},FRAME-RATE={:.3f}\n'.format(
+                master_playlist_file.write('#EXT-X-STREAM-INF:{}AUDIO="{}",AVERAGE-BANDWIDTH={:.0f},BANDWIDTH={:.0f},VIDEO-RANGE={},CODECS="{}",RESOLUTION={:.0f}x{:.0f},FRAME-RATE={:.3f}'.format(
                                            subtitles_group,
                                            audio_group_name,
                                            video_track.average_segment_bitrate + audio_groups[audio_group_name]['average_segment_bitrate'],
@@ -1003,8 +1003,8 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                                            video_track.height,
                                            video_track.frame_rate))
                 if supplemental_codec_string != '':
-                    master_playlist_file.write(',SUPPLEMENTAL-CODECS="{}"\n'.format(supplemental_codec_string))
-                master_playlist_file.write(media_playlist_path+'\n')
+                    master_playlist_file.write(',SUPPLEMENTAL-CODECS="{}"'.format(supplemental_codec_string))
+                master_playlist_file.write('\n'+media_playlist_path+'\n')
         else:
             # no audio
             master_playlist_file.write('#EXT-X-STREAM-INF:{}AVERAGE-BANDWIDTH={:.0f},BANDWIDTH={:.0f},VIDEO-RANGE={},CODECS="{}",RESOLUTION={:.0f}x{:.0f},FRAME-RATE={:.3f}'.format(
@@ -1017,8 +1017,8 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                                        video_track.height,
                                        video_track.frame_rate))
             if supplemental_codec_string != '':
-                master_playlist_file.write(',SUPPLEMENTAL-CODECS="{}"\n'.format(supplemental_codec_string))
-            master_playlist_file.write(media_playlist_path+'\n')
+                master_playlist_file.write(',SUPPLEMENTAL-CODECS="{}"'.format(supplemental_codec_string))
+            master_playlist_file.write('\n'+media_playlist_path+'\n')
 
         OutputHlsTrack(options, video_track, all_audio_tracks + all_video_tracks, media_subdir, media_playlist_name, media_file_name)
         iframe_average_segment_bitrate,iframe_max_bitrate = OutputHlsIframeIndex(options, video_track, all_audio_tracks + all_video_tracks, media_subdir, iframes_playlist_name, media_file_name)
