@@ -116,8 +116,8 @@ public:
             
             AP4_Result ParseBitrateIndicator(AP4_BitReader &bits);
             AP4_Result ParseOamdCommonData  (AP4_BitReader &bits);
-            AP4_Result Trim                 (AP4_BitReader &bits);
-            AP4_Result BedRendeInfo         (AP4_BitReader &bits);
+            AP4_Size   Trim                 (AP4_BitReader &bits);
+            AP4_Size   BedRendeInfo         (AP4_BitReader &bits);
             AP4_UI32   ObjNumFromIsfConfig  (unsigned char isf_config);
             AP4_UI32   BedNumFromAssignCode (unsigned char assign_code);
             AP4_UI32   BedNumFromNonStdMask (unsigned int  non_std_mask);

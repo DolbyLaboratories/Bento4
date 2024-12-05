@@ -1003,7 +1003,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseOamdCommonData(AP4_BitReader &bits)
         }
         unsigned int bits_used = Trim(bits);
         bits_used += BedRendeInfo(bits);
-        bits.ReadBits(addDataBytes * 8 - bits_used);
+        bits.SkipBits(addDataBytes * 8 - bits_used);
     }
     return AP4_SUCCESS;
 }
@@ -1011,19 +1011,159 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseOamdCommonData(AP4_BitReader &bits)
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::Trim
 +---------------------------------------------------------------------*/
-AP4_Result
+AP4_Size
 AP4_Dac4Atom::Ac4Dsi::SubStream::Trim(AP4_BitReader &bits)
 {
-    return AP4_SUCCESS;
+    unsigned int begin = bits.GetBitsPosition();
+    if (bits.ReadBit()) {
+        bits.SkipBits(4);
+        unsigned int global_trim_mode = bits.ReadBits(2);
+        if (global_trim_mode == 0b10) {
+            for (unsigned int cfg = 0; cfg < 9; cfg++) {
+                if (bits.ReadBit() == 0) {
+                    if (bits.ReadBit() == 0) {
+                        unsigned int trim_balance_presence_0 = bits.ReadBit();
+                        unsigned int trim_balance_presence_1 = bits.ReadBit();
+                        unsigned int trim_balance_presence_2 = bits.ReadBit();
+                        unsigned int trim_balance_presence_3 = bits.ReadBit();
+                        unsigned int trim_balance_presence_4 = bits.ReadBit();
+                        if (trim_balance_presence_4) {
+                            bits.SkipBits(4); // trim_centre
+                        }
+                        if (trim_balance_presence_3) {
+                            bits.SkipBits(4); // trim_surround
+                        }
+                        if (trim_balance_presence_2) {
+                            bits.SkipBits(4); // trim_height
+                        }
+                        if (trim_balance_presence_1) {
+                            bits.SkipBits(5); // bal3D_Y_sign_tb_code, bal3D_Y_amount_tb
+                        }
+                        if (trim_balance_presence_0) {
+                            bits.SkipBits(5); // bal3D_Y_sign_lis_code, bal3D_Y_amount_lis
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return bits.GetBitsPosition() - begin;
 }
 
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::BedRendeInfo
 +---------------------------------------------------------------------*/
-AP4_Result
+AP4_Size
 AP4_Dac4Atom::Ac4Dsi::SubStream::BedRendeInfo(AP4_BitReader &bits)
 {
-    return AP4_SUCCESS;
+    unsigned int begin = bits.GetBitsPosition();
+    if (bits.ReadBit()) {
+        if (bits.ReadBit()) { // b_stereo_dmx_coeff
+            // stereo_dmx_coeff();
+            bits.SkipBits(3); // loro_centre_mixgain
+            bits.SkipBits(3); // loro_surround_mixgain
+            if (bits.ReadBit()) { // b_ltrt_mixinfo
+                bits.SkipBits(3); // ltrt_centre_mixgain
+                bits.SkipBits(3); // ltrt_surround_mixgain
+            }
+            if (bits.ReadBit()) { // b_lfe_mixinfo
+                bits.SkipBits(5); // lfe_mixgain
+            }
+            bits.SkipBits(2); // preferred_dmx_method
+        }
+        if (bits.ReadBit()) { // b_cdmx_data_present
+            if (bits.ReadBit()) { // b_cdmx_w_to_f
+                bits.SkipBits(3); // gain_w_to_f_code
+            }
+            if (bits.ReadBit()) { // b_cdmx_b4_to_b2
+                bits.SkipBits(3); // gain_b4_to_b2_code
+            }
+            if (bits.ReadBit()) { // b_tm_ch_present
+                if (bits.ReadBit()) { // b_cdmx_t2_to_f_s_b
+                    // tool_t2_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_to_side
+                            bits.SkipBits(3); // gain_t2b_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2c_code
+                        }
+                    }
+                }
+                if (bits.ReadBit()) { // b_cdmx_t2_to_f_s
+                    // tool_t2_to_f_s();
+                    if (bits.ReadBit()) { // b_top_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2b_code
+                    }
+                }
+            }
+            unsigned int b_tb_ch_present = bits.ReadBit();
+            if (b_tb_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tb_to_f_s_b
+                    // tool_tb_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_back_to_front
+                        bits.SkipBits(3); // gain_t2d_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_back_to_side
+                            bits.SkipBits(3); // gain_t2e_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2f_code
+                        }
+                    }
+
+                }
+                if (bits.ReadBit()) { // b_cdmx_tb_to_f_s
+                    // tool_tb_to_f_s();
+                    if (bits.ReadBit()) { // b_top_back_to_front
+                        bits.SkipBits(3); // gain_t2d_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2e_code;
+                    }
+                }
+            }
+            unsigned int b_tf_ch_present = bits.ReadBit();
+            if (b_tf_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tf_to_f_s_b
+                    // tool_tf_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_front_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_front_to_side
+                            bits.SkipBits(3); // gain_t2b_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2c_code
+                        }
+                    }
+                }
+                if (bits.ReadBit()) { // b_cdmx_tf_to_f_s
+                    // tool_tf_to_f_s();
+                    if (bits.ReadBit()) { // b_top_front_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2b_code
+                    }
+                }
+            }
+            if (b_tb_ch_present || b_tf_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tfb_to_tm
+                    bits.SkipBits(3); // gain_tfb_to_tm_code
+                }
+            }
+        }
+    }
+    return bits.GetBitsPosition() - begin;
 }
 
 /*----------------------------------------------------------------------
