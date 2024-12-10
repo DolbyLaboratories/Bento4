@@ -76,6 +76,14 @@ struct Parameter {
     AP4_String m_Value;
 };
 
+struct Gapless_roll {
+    Gapless_roll(double hoff, double toff) :
+        pre_roll(hoff),
+        post_roll(toff) {}
+    double pre_roll;
+    double post_roll;
+};
+
 /*----------------------------------------------------------------------
 |   PrintUsageAndExit
 +---------------------------------------------------------------------*/
@@ -107,6 +115,10 @@ PrintUsageAndExit()
             "  ac3:  Dolby Digital\n"
             "  ec3:  Dolby Digital Plus\n"
             "  ac4:  Dolby AC-4\n"
+            "      pre_roll: floating point number for the point at which the track starts playing, only support \n"
+            "              ec3 and ac4 (default = 0) (pre_roll > 0 means to cut off the track from the begining) \n"
+            "      post_roll: floating point number for the point at which the track stops playing, only support \n"
+            "              ec3 and ac4 (default = 0) (post_roll > 0 means to cut off the track at the end) \n"
 
             "  mp4:  MP4 track(s) from an MP4 file\n"
             "    optional params:\n"
@@ -410,6 +422,78 @@ GetLanguageFromParameters(AP4_Array<Parameter>& parameters, const char* defaut_v
 }
 
 /*----------------------------------------------------------------------
+|   ParseGaplessOffsetParameter
++---------------------------------------------------------------------*/
+static Gapless_roll
+ParseGaplessOffsetParameter(AP4_Array<Parameter>& parameters)
+{
+    Gapless_roll offset(0, 0);
+    for (unsigned int i=0; i<parameters.ItemCount(); i++) {
+        if (parameters[i].m_Name == "pre_roll") {
+            offset.pre_roll = atof(parameters[i].m_Value.GetChars());
+        }
+        if (parameters[i].m_Name == "post_roll") {
+            offset.post_roll = atof(parameters[i].m_Value.GetChars());
+        }
+    }
+
+    return offset;
+}
+
+/*----------------------------------------------------------------------
+|   ConvertRollEditList
++---------------------------------------------------------------------*/
+static AP4_Result
+ConvertRollEditList(AP4_UI64            duration,
+                    AP4_UI32            timescale,
+                    Gapless_roll&       offset,
+                    AP4_ElstAtom*       new_elst)
+{
+    // check if there is offset
+    if (offset.pre_roll == 0 && offset.post_roll == 0) {
+        AP4_ElstEntry entry = AP4_ElstEntry(duration, 0, 1);
+        new_elst->AddEntry(entry);
+        return AP4_SUCCESS;
+    }
+
+    AP4_SI64 pre = AP4_SI64(offset.pre_roll * timescale + 0.5);
+    AP4_SI64 post = AP4_SI64(offset.post_roll * timescale + 0.5);
+    AP4_UI64 media_duration = 0;
+    AP4_UI64 segment_duration = duration;
+
+    // check if the rolling is acceptable??
+    if (duration < AP4_UI64(abs(pre) + abs(post))) {
+        fprintf(stderr, "ERROR: The track is too short to handle pre_roll and post_roll, duration (%llu)s\n", duration / timescale);
+        return AP4_FAILURE;
+    }
+
+    // edit list with media_time = -1 at the begining of presentation
+    if (pre < 0) {
+        AP4_ElstEntry entry = AP4_ElstEntry(-pre, -1, 1);
+        new_elst->AddEntry(entry);
+    }
+
+    // edit list of the track playing
+    if (pre > 0) {
+        media_duration = pre;
+        segment_duration -= pre;
+    }
+    if (post > 0) {
+        segment_duration -= post;
+    }
+    AP4_ElstEntry entry = AP4_ElstEntry(segment_duration, media_duration, 1);
+    new_elst->AddEntry(entry);
+
+    // edit list with media_time = -1 at the end of presentation
+    if (post < 0) {
+        AP4_ElstEntry entry = AP4_ElstEntry(-post, -1, 1);
+        new_elst->AddEntry(entry);
+    }
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
 |   AddAacTrack
 +---------------------------------------------------------------------*/
 static void
@@ -664,15 +748,17 @@ AddAc3Track(AP4_Movie&             movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = sample_rate;
         if (!movie.GetTimeScale()) {
             duration = sample_count * 1536;
         } else {
             duration = AP4_ConvertTime(1536*sample_table->GetSampleCount(), sample_rate, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
         AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, 0, 1);
         new_elst->AddEntry(new_elst_entry);
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
 
     // cleanup
@@ -700,6 +786,9 @@ AddEac3Track(AP4_Movie&             movie,
     // check if we have a language parameter
     const char* language = GetLanguageFromParameters(parameters, "und");
     if (!language) return;
+
+    // check if we have a pre_roll parameter or a post_roll parameter, default 0
+    Gapless_roll offset = ParseGaplessOffsetParameter(parameters);
 
     // create a sample table
     AP4_SyntheticSampleTable* sample_table = new AP4_SyntheticSampleTable(); // The parameter chunk_size is used to control chunk size in 'stsc' box
@@ -805,21 +894,25 @@ AddEac3Track(AP4_Movie&             movie,
                                      language,            // language
                                      0, 0);               // width, height
 
-    // add an edit list with MediaTime==0 to ec3 track defautly.
+    // add an edit list based on RollOffset to ec3 track, default 0.
     if (1) {
         // create an 'edts' container
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = sample_rate;
         if (!movie.GetTimeScale()) {
             duration = sample_count * 1536;
         } else {
             duration = AP4_ConvertTime(1536*sample_table->GetSampleCount(), sample_rate, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
-        AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, 0, 1);
-        new_elst->AddEntry(new_elst_entry);
+        if (AP4_FAILED(ConvertRollEditList(duration, edts_timescale, offset, new_elst))) {
+            input->Release();
+            return;
+        }
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
 
     // cleanup
@@ -847,6 +940,9 @@ AddAc4Track(AP4_Movie&            movie,
     // check if we have a language parameter
     const char* language = GetLanguageFromParameters(parameters, "und");
     if (!language) return;
+
+    // check if we have a pre_roll parameter or a post_roll parameter, default 0
+    Gapless_roll offset = ParseGaplessOffsetParameter(parameters);
 
     // create a sample table
     AP4_SyntheticSampleTable* sample_table = new AP4_SyntheticSampleTable(); // The parameter chunk_size is used to control chunk size in 'stsc' box
@@ -953,21 +1049,25 @@ AddAc4Track(AP4_Movie&            movie,
                                      language,                                 // language
                                      0, 0);                                    // width, height
 
-    // add an edit list with MediaTime==0 to ac4 track defautly.
+    // add an edit list based on RollOffset to ac4 track, default 0.
     if (1) {
         // create an 'edts' container
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = media_time_scale;
         if (!movie.GetTimeScale()) {
             duration = AP4_UI64(sample_count) * sample_duration;
         } else {
-            duration = AP4_ConvertTime(AP4_UI64(sample_count)*sample_table->GetSampleCount(), media_time_scale, movie.GetTimeScale());
+            duration = AP4_ConvertTime(sample_duration*sample_table->GetSampleCount(), media_time_scale, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
-        AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, 0, 1);
-        new_elst->AddEntry(new_elst_entry);
+        if (AP4_FAILED(ConvertRollEditList(duration, edts_timescale, offset, new_elst))) {
+            input->Release();
+            return;
+        }
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
 
     // cleanup
@@ -1178,7 +1278,7 @@ AddH264Track(AP4_Movie&            movie,
                                      0,                    // auto-select track id
                                      movie_timescale,      // movie time scale
                                      video_track_duration, // track duration
-                                     media_timescale,      // media time scale
+                                     video_frame_rate,     // media time scale
                                      video_media_duration, // media duration
                                      language,             // language
                                      video_width<<16,      // width
@@ -1190,15 +1290,17 @@ AddH264Track(AP4_Movie&            movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = media_timescale;
         if (!movie.GetTimeScale()) {
             duration = video_media_duration;
         } else {
             duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), media_timescale, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
         AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, max_delta*1000ULL, 1);
         new_elst->AddEntry(new_elst_entry);
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
     // update the brands list
     brands.Append(AP4_FILE_BRAND_AVC1);
@@ -1462,9 +1564,9 @@ AddH264DoviTrack(AP4_Movie&            movie,
                                      0,                    // auto-select track id
                                      movie_timescale,      // movie time scale
                                      video_track_duration, // track duration
-                                     media_timescale,      // media time scale
+                                     video_frame_rate,     // media time scale
                                      video_media_duration, // media duration
-                                     language,             // language
+                                     language,              // language
                                      video_width<<16,      // width
                                      video_height<<16      // height
                                      );
@@ -1474,15 +1576,17 @@ AddH264DoviTrack(AP4_Movie&            movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = media_timescale;
         if (!movie.GetTimeScale()) {
             duration = video_media_duration;
         } else {
             duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), media_timescale, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
         AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, max_delta*1000ULL, 1);
         new_elst->AddEntry(new_elst_entry);
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
     // update the brands list
     brands.Append(format);
@@ -1739,7 +1843,7 @@ AddH265Track(AP4_Movie&            movie,
                                      0,                    // auto-select track id
                                      movie_timescale,      // movie time scale
                                      video_track_duration, // track duration
-                                     media_timescale,      // media time scale
+                                     video_frame_rate,     // media time scale
                                      video_media_duration, // media duration
                                      language,             // language
                                      video_width<<16,      // width
@@ -1752,15 +1856,17 @@ AddH265Track(AP4_Movie&            movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
-        if (!movie.GetTimeScale()) {
+        AP4_UI32 edts_timescale = media_timescale;
+        if(!movie.GetTimeScale()) {
             duration = video_media_duration;
         } else {
             duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), media_timescale, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
         AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, max_delta*1000ULL, 1);
         new_elst->AddEntry(new_elst_entry);
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
     // update the brands list
     brands.Append(AP4_FILE_BRAND_HVC1);
@@ -2067,8 +2173,8 @@ AddH265DoviTrack(AP4_Movie&           movie,
     sample_table->AddSampleDescription(sample_description);
 
     AP4_UI32 movie_timescale      = 1000;
-    AP4_UI32 media_timescale      = video_frame_rate;
-    AP4_UI64 video_track_duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), media_timescale, movie_timescale);
+    AP4_UI32 video_media_timescale= video_frame_rate;
+    AP4_UI32 video_track_duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), video_media_timescale, movie_timescale);
     AP4_UI64 video_media_duration = 1000*sample_table->GetSampleCount();
 
     // create a video track
@@ -2077,7 +2183,7 @@ AddH265DoviTrack(AP4_Movie&           movie,
                                      0,                    // auto-select track id
                                      movie_timescale,      // movie time scale
                                      video_track_duration, // track duration
-                                     media_timescale,      // media time scale
+                                     video_media_timescale,// media time scale
                                      video_media_duration, // media duration
                                      language,             // language
                                      video_width<<16,      // width
@@ -2089,15 +2195,17 @@ AddH265DoviTrack(AP4_Movie&           movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
+        AP4_UI32 edts_timescale = video_media_timescale;
         if (!movie.GetTimeScale()) {
             duration = video_media_duration;
         } else {
-            duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), media_timescale, movie.GetTimeScale());
+            duration = AP4_ConvertTime(1000*sample_table->GetSampleCount(), video_media_timescale, movie.GetTimeScale());
+            edts_timescale = movie.GetTimeScale();
         }
         AP4_ElstEntry new_elst_entry = AP4_ElstEntry(duration, max_delta*1000ULL, 1);
         new_elst->AddEntry(new_elst_entry);
         new_edts->AddChild(new_elst);
-        track->UseTrakAtom()->AddChild(new_edts, 1);
+        track->SetEditList(new_edts, edts_timescale);
     }
     // update the brands list
     brands.Append(format);

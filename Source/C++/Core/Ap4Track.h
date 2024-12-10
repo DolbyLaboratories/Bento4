@@ -46,6 +46,7 @@ class AP4_TrakAtom;
 class AP4_MoovAtom;
 class AP4_SampleDescription;
 class AP4_SampleTable;
+class AP4_ContainerAtom;
 
 /*----------------------------------------------------------------------
 |   constants
@@ -137,6 +138,7 @@ class AP4_Track {
     const char*   GetTrackLanguage() const;
     AP4_Result    SetTrackLanguage(const char* language);
     AP4_Result    Attach(AP4_MoovAtom* moov);
+    AP4_Result    SetEditList(const AP4_ContainerAtom* edts, AP4_UI32 edts_timescale);
 
  protected:
     // members
