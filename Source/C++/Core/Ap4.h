@@ -311,6 +311,7 @@
 #include "Ap4PsshAtom.h"
 #include "Ap4TfraAtom.h"
 #include "Ap4SbgpAtom.h"
+#include "Ap4SgpdAtom.h"
 #include "Ap4MfroAtom.h"
 #include "Ap4Dac3Atom.h"
 #include "Ap4Dec3Atom.h"

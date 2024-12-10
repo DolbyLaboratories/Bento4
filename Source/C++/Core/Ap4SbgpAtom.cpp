@@ -77,7 +77,7 @@ AP4_SbgpAtom::AP4_SbgpAtom(AP4_UI32        size,
     AP4_UI32 remains = size-AP4_FULL_ATOM_HEADER_SIZE;
     stream.ReadUI32(m_GroupingType);
     remains -= 4;
-    if (version >= 1) {
+    if (version == 1) {
         if (remains < 4) return;
         stream.ReadUI32(m_GroupingTypeParameter);
         remains -= 4;
@@ -109,7 +109,7 @@ AP4_SbgpAtom::WriteFields(AP4_ByteStream& stream)
     result = stream.WriteUI32(m_GroupingType);
     if (AP4_FAILED(result)) return result;
 
-    if (m_Version >= 1) {
+    if (m_Version == 1) {
         result = stream.WriteUI32(m_GroupingTypeParameter);
         if (AP4_FAILED(result)) return result;
     }
@@ -135,7 +135,7 @@ AP4_SbgpAtom::InspectFields(AP4_AtomInspector& inspector)
     char fourcc[5];
     AP4_FormatFourChars(fourcc, m_GroupingType);
     inspector.AddField("grouping_type", fourcc);
-    if (m_Version >= 1) {
+    if (m_Version == 1) {
         inspector.AddField("grouping_type_parameter", m_GroupingTypeParameter);
     }
     inspector.AddField("entry_count", m_Entries.ItemCount());
@@ -150,6 +150,71 @@ AP4_SbgpAtom::InspectFields(AP4_AtomInspector& inspector)
         }
         inspector.EndArray();
     }
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SbgpAtom::~AP4_SbgpAtom
++---------------------------------------------------------------------*/
+AP4_SbgpAtom::~AP4_SbgpAtom()
+{
+    m_Entries.Clear();
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SbgpAtom::SetGroupType
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SbgpAtom::SetGroupType(AP4_UI32 group_type)
+{
+    m_GroupingType = group_type;
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SbgpAtom::SetGroupTypeParameter
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SbgpAtom::SetGroupTypeParameter(AP4_UI32 group_type_param)
+{
+    m_Version = 1;
+    m_GroupingTypeParameter = group_type_param;
+    ResetSize();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SbgpAtom::AddEntry
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SbgpAtom::AddEntry(AP4_UI32 sc, AP4_UI32 idx)
+{
+    Entry entry;
+    entry.sample_count = sc;
+    entry.group_description_index = idx;
+
+    m_Entries.Append(entry);
+    ResetSize();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SbgpAtom::ResetSize
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SbgpAtom::ResetSize()
+{
+    AP4_Size size = 8; // group_type, entry_count
+
+    if (m_Version == 1) {
+        size += 4;
+    }
+
+    size += m_Entries.ItemCount() * 8;
+    SetSize(AP4_FULL_ATOM_HEADER_SIZE + size);
 
     return AP4_SUCCESS;
 }

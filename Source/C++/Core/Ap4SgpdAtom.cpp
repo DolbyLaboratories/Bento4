@@ -1,6 +1,6 @@
 /*****************************************************************
 |
-|    AP4 - sbgp Atoms
+|    AP4 - sgpd Atoms
 |
 |    Copyright 2002-2014 Axiomatic Systems, LLC
 |
@@ -75,13 +75,18 @@ AP4_SgpdAtom::AP4_SgpdAtom(AP4_UI32         size,
                            AP4_ByteStream&  stream) :
     AP4_Atom(AP4_ATOM_TYPE_SGPD, size, version, flags),
     m_GroupingType(0),
-    m_DefaultLength(0)
+    m_DefaultLength(0),
+    m_DefaultGroupDescriptionIndex(0)
 {
     AP4_Size bytes_available = size-AP4_FULL_ATOM_HEADER_SIZE;
     stream.ReadUI32(m_GroupingType);
     bytes_available -= 4;
     if (version >= 1) {
         stream.ReadUI32(m_DefaultLength);
+        bytes_available -= 4;
+    }
+    if (version >= 2) {
+        stream.ReadUI32(m_DefaultGroupDescriptionIndex);
         bytes_available -= 4;
     }
 
@@ -94,20 +99,15 @@ AP4_SgpdAtom::AP4_SgpdAtom(AP4_UI32         size,
     // read all entries
     for (unsigned int i=0; i<entry_count; i++) {
         AP4_UI32 description_length = m_DefaultLength;
-        if (m_Version == 0) {
-            // entry size unknown, read the whole thing
-            description_length = bytes_available;
-        } else {
-            if (m_DefaultLength == 0) {
-                description_length = stream.ReadUI32(description_length);
+        if (m_Version >= 1) {
+            if (description_length == 0) {
+                stream.ReadUI32(description_length);
             }
         }
-        if (description_length <= bytes_available) {
+        if (description_length && description_length <= bytes_available) {
             AP4_DataBuffer* payload = new AP4_DataBuffer();
-            if (description_length) {
-                payload->SetDataSize(description_length);
-                stream.Read(payload->UseData(), description_length);
-            }
+            payload->SetDataSize(description_length);
+            stream.Read(payload->UseData(), description_length);
             m_Entries.Add(payload);
         }
     }
@@ -127,7 +127,11 @@ AP4_SgpdAtom::WriteFields(AP4_ByteStream& stream)
         result = stream.WriteUI32(m_DefaultLength);
         if (AP4_FAILED(result)) return result;
     }
-    
+    if (m_Version >= 2) {
+        result = stream.WriteUI32(m_DefaultGroupDescriptionIndex);
+        if (AP4_FAILED(result)) return result;
+    }
+
     // write the children
     result = stream.WriteUI32(m_Entries.ItemCount());
     if (AP4_FAILED(result)) return result;
@@ -162,6 +166,9 @@ AP4_SgpdAtom::InspectFields(AP4_AtomInspector& inspector)
     if (m_Version >= 1) {
         inspector.AddField("default_length", m_DefaultLength);
     }
+    if (m_Version >= 2) {
+        inspector.AddField("default_group_description_index", m_DefaultGroupDescriptionIndex);
+    }
     inspector.AddField("entry_count", m_Entries.ItemCount());
     
     // inspect entries
@@ -170,9 +177,118 @@ AP4_SgpdAtom::InspectFields(AP4_AtomInspector& inspector)
                                          item;
                                          item = item->GetNext()) {
         AP4_DataBuffer* entry = item->GetData();
+        if (m_Version >= 1) {
+            if (m_DefaultLength == 0) {
+                inspector.AddField("description_length", entry->GetDataSize());
+            }
+        }
         inspector.AddField(NULL, entry->GetData(), entry->GetDataSize());
     }
     inspector.EndArray();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::AP4_SgpdAtom
++---------------------------------------------------------------------*/
+AP4_SgpdAtom::AP4_SgpdAtom() :
+    AP4_Atom(AP4_ATOM_TYPE_SGPD, AP4_FULL_ATOM_HEADER_SIZE + 8, 0, 0),
+    m_GroupingType(0),
+    m_DefaultLength(0),
+    m_DefaultGroupDescriptionIndex(0)
+{
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::SetGroupType
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SgpdAtom::SetGroupType(AP4_UI32 group_type)
+{
+    m_GroupingType = group_type;
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::SetDefaultLength
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SgpdAtom::SetDefaultLength(AP4_UI32 default_length)
+{
+    if (m_Version < 1) {
+        m_Version = 1;
+    }
+
+    m_DefaultLength = default_length;
+    ResetSize();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::SetDefaultGroupDescriptioIndex
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SgpdAtom::SetDefaultGroupDescriptioIndex(AP4_UI32 idx)
+{
+    if (m_Version < 2) {
+        m_Version = 2;
+    }
+
+    m_DefaultGroupDescriptionIndex = idx;
+    ResetSize();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::AddEntry
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SgpdAtom::AddEntry(AP4_Byte* buffer,AP4_Size buffer_size)
+{
+    AP4_DataBuffer *payload = new AP4_DataBuffer(buffer, buffer_size);
+    payload->SetDataSize(buffer_size);
+
+    if (buffer_size != m_DefaultLength && m_DefaultLength != 0) {
+        m_DefaultLength = 0;
+        if (m_Version < 1) {
+            m_Version = 1;
+        }
+    }
+
+    m_Entries.Add(payload);
+    ResetSize();
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_SgpdAtom::ResetSize
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_SgpdAtom::ResetSize()
+{
+    AP4_Size size = 8; // group_type, entry_count
+
+    if (m_Version >= 1) {
+        size += 4;
+    }
+    if (m_Version >= 2) {
+        size += 4;
+    }
+    for (AP4_List<AP4_DataBuffer>::Item* item = m_Entries.FirstItem();
+                                         item;
+                                         item = item->GetNext()) {
+        if (m_Version >= 1 && m_DefaultLength == 0) {
+            size += 4;
+        }
+        size += item->GetData()->GetDataSize();
+    }
+
+    SetSize(AP4_FULL_ATOM_HEADER_SIZE + size);
 
     return AP4_SUCCESS;
 }
