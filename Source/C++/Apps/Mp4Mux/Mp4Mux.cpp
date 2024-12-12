@@ -994,6 +994,12 @@ AddEac3Track(AP4_Movie&             movie,
         }
         new_edts->AddChild(new_elst);
         track->SetEditList(new_edts, edts_timescale);
+
+        // add sbgp, sgpd for EAC3 gapless
+        if (offset.pre_roll > 0) {
+            AP4_UI64 frames_roll = AP4_UI64(offset.pre_roll * edts_timescale / 1536);
+            SetPreRollSampleGroupDescription(track, frames_roll, sample_count, 1919904876); // "roll" for all codecs that don’t use the I-frame concept
+        }
     }
 
     // cleanup
