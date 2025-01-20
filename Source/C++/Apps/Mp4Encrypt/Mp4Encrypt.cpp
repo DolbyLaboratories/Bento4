@@ -728,7 +728,7 @@ main(int argc, char** argv)
                 
                 // create the output stream
                 char fragment_output_filename[MP4_ENCRYPT_MAX_FILENAME_LENGTH + 1];
-                snprintf(fragment_output_filename, sizeof(fragment_output_filename), output_filename, fragment_input_filename);
+                sprintf(fragment_output_filename, output_filename, fragment_input_filename);
                 result = AP4_FileByteStream::Create(fragment_output_filename,
                                                     AP4_FileByteStream::STREAM_MODE_WRITE,
                                                     output);
