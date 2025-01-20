@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 51;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXAggregateTarget section */
@@ -80,6 +80,26 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		2D8B5CB129F08EAA00995769 /* Ap4AedbAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D8B5CA729F08EAA00995769 /* Ap4AedbAtom.h */; };
+		2D8B5CB229F08EAA00995769 /* Ap4AeppAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D8B5CA829F08EAA00995769 /* Ap4AeppAtom.h */; };
+		2D8B5CB329F08EAA00995769 /* Ap4AeprAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D8B5CA929F08EAA00995769 /* Ap4AeprAtom.h */; };
+		2D8B5CB429F08EAA00995769 /* Ap4AesdAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D8B5CAA29F08EAA00995769 /* Ap4AesdAtom.h */; };
+		2D8B5CB529F08EAA00995769 /* Ap4ChnlAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D8B5CAB29F08EAA00995769 /* Ap4ChnlAtom.cpp */; };
+		2D8B5CB629F08EAB00995769 /* Ap4AedbAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D8B5CAC29F08EAA00995769 /* Ap4AedbAtom.cpp */; };
+		2D8B5CB729F08EAB00995769 /* Ap4AeppAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D8B5CAD29F08EAA00995769 /* Ap4AeppAtom.cpp */; };
+		2D8B5CB829F08EAB00995769 /* Ap4AeprAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D8B5CAE29F08EAA00995769 /* Ap4AeprAtom.cpp */; };
+		2D8B5CB929F08EAB00995769 /* Ap4AesdAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D8B5CAF29F08EAA00995769 /* Ap4AesdAtom.cpp */; };
+		2D8B5CBA29F08EAB00995769 /* Ap4ChnlAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D8B5CB029F08EAA00995769 /* Ap4ChnlAtom.h */; };
+		2DEEB6E629D79E7000B97936 /* Ap4LablAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEEB6E529D79E7000B97936 /* Ap4LablAtom.cpp */; };
+		2DEEB6E829D79E7E00B97936 /* Ap4LablAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEEB6E729D79E7E00B97936 /* Ap4LablAtom.h */; };
+		2DEEB6EE29DB4D4600B97936 /* Ap4PrslAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEEB6ED29DB4D4600B97936 /* Ap4PrslAtom.cpp */; };
+		2DEEB6F029DB4D5000B97936 /* Ap4PrslAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEEB6EF29DB4D5000B97936 /* Ap4PrslAtom.h */; };
+		2DEEB6FF29DC87AC00B97936 /* Ap4KindAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEEB6F929DC87AA00B97936 /* Ap4KindAtom.h */; };
+		2DEEB70029DC87AC00B97936 /* Ap4ElngAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEEB6FA29DC87AB00B97936 /* Ap4ElngAtom.cpp */; };
+		2DEEB70129DC87AC00B97936 /* Ap4ArdiAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEEB6FB29DC87AB00B97936 /* Ap4ArdiAtom.h */; };
+		2DEEB70229DC87AC00B97936 /* Ap4ElngAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEEB6FC29DC87AB00B97936 /* Ap4ElngAtom.h */; };
+		2DEEB70329DC87AC00B97936 /* Ap4ArdiAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEEB6FD29DC87AB00B97936 /* Ap4ArdiAtom.cpp */; };
+		2DEEB70429DC87AC00B97936 /* Ap4KindAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEEB6FE29DC87AC00B97936 /* Ap4KindAtom.cpp */; };
 		A8636048224CCDCC00BBDD6A /* Ap4Eac3Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8636046224CCDCC00BBDD6A /* Ap4Eac3Parser.cpp */; };
 		A8636049224CCDCC00BBDD6A /* Ap4Eac3Parser.h in Headers */ = {isa = PBXBuildFile; fileRef = A8636047224CCDCC00BBDD6A /* Ap4Eac3Parser.h */; };
 		A8DFF208222E4970006CBAE9 /* Ap4Ac4Utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8DFF206222E496F006CBAE9 /* Ap4Ac4Utils.cpp */; };
@@ -1042,6 +1062,26 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D8B5CA729F08EAA00995769 /* Ap4AedbAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4AedbAtom.h; sourceTree = "<group>"; };
+		2D8B5CA829F08EAA00995769 /* Ap4AeppAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4AeppAtom.h; sourceTree = "<group>"; };
+		2D8B5CA929F08EAA00995769 /* Ap4AeprAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4AeprAtom.h; sourceTree = "<group>"; };
+		2D8B5CAA29F08EAA00995769 /* Ap4AesdAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4AesdAtom.h; sourceTree = "<group>"; };
+		2D8B5CAB29F08EAA00995769 /* Ap4ChnlAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4ChnlAtom.cpp; sourceTree = "<group>"; };
+		2D8B5CAC29F08EAA00995769 /* Ap4AedbAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4AedbAtom.cpp; sourceTree = "<group>"; };
+		2D8B5CAD29F08EAA00995769 /* Ap4AeppAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4AeppAtom.cpp; sourceTree = "<group>"; };
+		2D8B5CAE29F08EAA00995769 /* Ap4AeprAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4AeprAtom.cpp; sourceTree = "<group>"; };
+		2D8B5CAF29F08EAA00995769 /* Ap4AesdAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4AesdAtom.cpp; sourceTree = "<group>"; };
+		2D8B5CB029F08EAA00995769 /* Ap4ChnlAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4ChnlAtom.h; sourceTree = "<group>"; };
+		2DEEB6E529D79E7000B97936 /* Ap4LablAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4LablAtom.cpp; sourceTree = "<group>"; };
+		2DEEB6E729D79E7E00B97936 /* Ap4LablAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4LablAtom.h; sourceTree = "<group>"; };
+		2DEEB6ED29DB4D4600B97936 /* Ap4PrslAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4PrslAtom.cpp; sourceTree = "<group>"; };
+		2DEEB6EF29DB4D5000B97936 /* Ap4PrslAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4PrslAtom.h; sourceTree = "<group>"; };
+		2DEEB6F929DC87AA00B97936 /* Ap4KindAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4KindAtom.h; sourceTree = "<group>"; };
+		2DEEB6FA29DC87AB00B97936 /* Ap4ElngAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4ElngAtom.cpp; sourceTree = "<group>"; };
+		2DEEB6FB29DC87AB00B97936 /* Ap4ArdiAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4ArdiAtom.h; sourceTree = "<group>"; };
+		2DEEB6FC29DC87AB00B97936 /* Ap4ElngAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4ElngAtom.h; sourceTree = "<group>"; };
+		2DEEB6FD29DC87AB00B97936 /* Ap4ArdiAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4ArdiAtom.cpp; sourceTree = "<group>"; };
+		2DEEB6FE29DC87AC00B97936 /* Ap4KindAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4KindAtom.cpp; sourceTree = "<group>"; };
 		A8636046224CCDCC00BBDD6A /* Ap4Eac3Parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4Eac3Parser.cpp; sourceTree = "<group>"; };
 		A8636047224CCDCC00BBDD6A /* Ap4Eac3Parser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4Eac3Parser.h; sourceTree = "<group>"; };
 		A8DFF206222E496F006CBAE9 /* Ap4Ac4Utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4Ac4Utils.cpp; sourceTree = "<group>"; };
@@ -2070,6 +2110,26 @@
 		CA93660F0B437D030067D50B /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				2D8B5CAC29F08EAA00995769 /* Ap4AedbAtom.cpp */,
+				2D8B5CA729F08EAA00995769 /* Ap4AedbAtom.h */,
+				2D8B5CAD29F08EAA00995769 /* Ap4AeppAtom.cpp */,
+				2D8B5CA829F08EAA00995769 /* Ap4AeppAtom.h */,
+				2D8B5CAE29F08EAA00995769 /* Ap4AeprAtom.cpp */,
+				2D8B5CA929F08EAA00995769 /* Ap4AeprAtom.h */,
+				2D8B5CAF29F08EAA00995769 /* Ap4AesdAtom.cpp */,
+				2D8B5CAA29F08EAA00995769 /* Ap4AesdAtom.h */,
+				2D8B5CAB29F08EAA00995769 /* Ap4ChnlAtom.cpp */,
+				2D8B5CB029F08EAA00995769 /* Ap4ChnlAtom.h */,
+				2DEEB6FD29DC87AB00B97936 /* Ap4ArdiAtom.cpp */,
+				2DEEB6FB29DC87AB00B97936 /* Ap4ArdiAtom.h */,
+				2DEEB6FA29DC87AB00B97936 /* Ap4ElngAtom.cpp */,
+				2DEEB6FC29DC87AB00B97936 /* Ap4ElngAtom.h */,
+				2DEEB6FE29DC87AC00B97936 /* Ap4KindAtom.cpp */,
+				2DEEB6F929DC87AA00B97936 /* Ap4KindAtom.h */,
+				2DEEB6EF29DB4D5000B97936 /* Ap4PrslAtom.h */,
+				2DEEB6ED29DB4D4600B97936 /* Ap4PrslAtom.cpp */,
+				2DEEB6E729D79E7E00B97936 /* Ap4LablAtom.h */,
+				2DEEB6E529D79E7000B97936 /* Ap4LablAtom.cpp */,
 				A8DFF206222E496F006CBAE9 /* Ap4Ac4Utils.cpp */,
 				A8DFF207222E4970006CBAE9 /* Ap4Ac4Utils.h */,
 				CA5A8F8B13541628007C6EFC /* Ap4.cpp */,
@@ -2543,6 +2603,7 @@
 				CA9366A30B437D040067D50B /* Ap4Atom.h in Headers */,
 				CA9366A50B437D040067D50B /* Ap4AtomFactory.h in Headers */,
 				CA9366A70B437D040067D50B /* Ap4AtomSampleTable.h in Headers */,
+				2D8B5CB329F08EAA00995769 /* Ap4AeprAtom.h in Headers */,
 				CA9366A90B437D040067D50B /* Ap4ByteStream.h in Headers */,
 				CA9366AB0B437D040067D50B /* Ap4Co64Atom.h in Headers */,
 				CA9366AC0B437D040067D50B /* Ap4Config.h in Headers */,
@@ -2555,6 +2616,7 @@
 				CA9366B90B437D040067D50B /* Ap4DecoderSpecificInfoDescriptor.h in Headers */,
 				CA9366BB0B437D040067D50B /* Ap4Descriptor.h in Headers */,
 				CA9366BD0B437D040067D50B /* Ap4DescriptorFactory.h in Headers */,
+				2DEEB70229DC87AC00B97936 /* Ap4ElngAtom.h in Headers */,
 				CA9366BF0B437D040067D50B /* Ap4DrefAtom.h in Headers */,
 				CAB82A0A1859CD7000FC4944 /* Ap4Dec3Atom.h in Headers */,
 				CA9366C10B437D040067D50B /* Ap4EsDescriptor.h in Headers */,
@@ -2562,6 +2624,7 @@
 				CA9366C50B437D040067D50B /* Ap4File.h in Headers */,
 				CA9366C60B437D040067D50B /* Ap4FileByteStream.h in Headers */,
 				CA9366C80B437D040067D50B /* Ap4FileWriter.h in Headers */,
+				2D8B5CB429F08EAA00995769 /* Ap4AesdAtom.h in Headers */,
 				CA9366CA0B437D040067D50B /* Ap4FrmaAtom.h in Headers */,
 				CA86EED219A95C68008A3B00 /* Ap4SegmentBuilder.h in Headers */,
 				CA094DB518D80E220032290E /* Ap4HvccAtom.h in Headers */,
@@ -2584,6 +2647,8 @@
 				CAEF5D3419EB2CB5007B66A8 /* Ap4SgpdAtom.h in Headers */,
 				CA9366EA0B437D040067D50B /* Ap4OdafAtom.h in Headers */,
 				CA9366EC0B437D040067D50B /* Ap4OddaAtom.h in Headers */,
+				2D8B5CBA29F08EAB00995769 /* Ap4ChnlAtom.h in Headers */,
+				2DEEB6F029DB4D5000B97936 /* Ap4PrslAtom.h in Headers */,
 				CA9366EE0B437D040067D50B /* Ap4OdheAtom.h in Headers */,
 				CA9366F00B437D040067D50B /* Ap4OhdrAtom.h in Headers */,
 				CA9366F20B437D040067D50B /* Ap4OmaDcf.h in Headers */,
@@ -2593,6 +2658,7 @@
 				CA9366F70B437D040067D50B /* Ap4Results.h in Headers */,
 				CA9366F90B437D040067D50B /* Ap4RtpAtom.h in Headers */,
 				A8DFF20D222E49A7006CBAE9 /* Ap4Ac4Parser.h in Headers */,
+				2DEEB70129DC87AC00B97936 /* Ap4ArdiAtom.h in Headers */,
 				CA9366FB0B437D040067D50B /* Ap4RtpHint.h in Headers */,
 				CA9366FD0B437D040067D50B /* Ap4Sample.h in Headers */,
 				CA9366FF0B437D040067D50B /* Ap4SampleDescription.h in Headers */,
@@ -2622,6 +2688,7 @@
 				CA93672A0B437D040067D50B /* Ap4UrlAtom.h in Headers */,
 				CA93672C0B437D040067D50B /* Ap4Utils.h in Headers */,
 				CA93672D0B437D040067D50B /* Ap4Version.h in Headers */,
+				2D8B5CB129F08EAA00995769 /* Ap4AedbAtom.h in Headers */,
 				CA93672F0B437D040067D50B /* Ap4VmhdAtom.h in Headers */,
 				CA9367360B437D1D0067D50B /* Ap4AesBlockCipher.h in Headers */,
 				CA9367380B437D1D0067D50B /* Ap4StreamCipher.h in Headers */,
@@ -2655,11 +2722,13 @@
 				CAFC31DA0FEB95F700EF80A0 /* Ap4MovieFragment.h in Headers */,
 				CAFC31F10FEBAA9200EF80A0 /* Ap4FragmentSampleTable.h in Headers */,
 				CAE03AC01034AE0D006FAFD7 /* Ap4Hmac.h in Headers */,
+				2DEEB6E829D79E7E00B97936 /* Ap4LablAtom.h in Headers */,
 				CA04DFDF1040921500AD5863 /* Ap4KeyWrap.h in Headers */,
 				CA15CC33107DCEEF0085F329 /* Ap4SampleSource.h in Headers */,
 				CA2DBC7E108165330012E204 /* Ap4Mpeg2Ts.h in Headers */,
 				CA8E2B431092B71E0042A0AF /* Ap4Piff.h in Headers */,
 				CA91A81310A24D38008618FE /* Ap4TfraAtom.h in Headers */,
+				2D8B5CB229F08EAA00995769 /* Ap4AeppAtom.h in Headers */,
 				CA91A84D10A29A56008618FE /* Ap4MfroAtom.h in Headers */,
 				A8DFF209222E4970006CBAE9 /* Ap4Ac4Utils.h in Headers */,
 				CAA4FF2110B2CBB3009C8F5B /* Ap4Mp4AudioInfo.h in Headers */,
@@ -2672,6 +2741,7 @@
 				CA5734EF13B5DBB100953446 /* Ap4SaizAtom.h in Headers */,
 				CA5734FE13B5DCFA00953446 /* Ap4SencAtom.h in Headers */,
 				CA15E16E1467D01A00D4EC8B /* Ap4PdinAtom.h in Headers */,
+				2DEEB6FF29DC87AC00B97936 /* Ap4KindAtom.h in Headers */,
 				CAF0104A15343D5D00CCD976 /* Ap4AinfAtom.h in Headers */,
 				CAF0104C15343D5D00CCD976 /* Ap4BlocAtom.h in Headers */,
 				CAF0105015343E4000CCD976 /* Ap4PsshAtom.h in Headers */,
@@ -3400,7 +3470,8 @@
 		08FB7793FE84155DC02AAC07 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0900;
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1540;
 				TargetAttributes = {
 					CA00A6521A1C36560064B4D3 = {
 						CreatedOnToolsVersion = 6.1;
@@ -3419,14 +3490,15 @@
 				};
 			};
 			buildConfigurationList = 1DEB91EF08733DB70010E9CD /* Build configuration list for PBXProject "Bento4" */;
-			compatibilityVersion = "Xcode 10.0";
-			developmentRegion = English;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
 			hasScannedForEncodings = 1;
 			knownRegions = (
-				English,
-				Japanese,
-				French,
-				German,
+				en,
+				Base,
+				de,
+				fr,
+				ja,
 			);
 			mainGroup = 08FB7794FE84155DC02AAC07 /* Bento4 */;
 			projectDirPath = "";
@@ -3818,8 +3890,10 @@
 				CA9366D60B437D040067D50B /* Ap4IproAtom.cpp in Sources */,
 				CA9366D80B437D040067D50B /* Ap4IsfmAtom.cpp in Sources */,
 				CA9366DA0B437D040067D50B /* Ap4IsltAtom.cpp in Sources */,
+				2D8B5CB929F08EAB00995769 /* Ap4AesdAtom.cpp in Sources */,
 				CA9366DC0B437D040067D50B /* Ap4IsmaCryp.cpp in Sources */,
 				CA9366DF0B437D040067D50B /* Ap4MdhdAtom.cpp in Sources */,
+				2DEEB6EE29DB4D4600B97936 /* Ap4PrslAtom.cpp in Sources */,
 				A8DFF20C222E49A7006CBAE9 /* Ap4Ac4Parser.cpp in Sources */,
 				CA9366E10B437D040067D50B /* Ap4MoovAtom.cpp in Sources */,
 				CA86EED119A95C68008A3B00 /* Ap4SegmentBuilder.cpp in Sources */,
@@ -3827,6 +3901,7 @@
 				CA7B648019D2355F00068D77 /* Ap4SidxAtom.cpp in Sources */,
 				CA9366E50B437D040067D50B /* Ap4MvhdAtom.cpp in Sources */,
 				CA9366E70B437D040067D50B /* Ap4NmhdAtom.cpp in Sources */,
+				2D8B5CB529F08EAA00995769 /* Ap4ChnlAtom.cpp in Sources */,
 				CA9366E90B437D040067D50B /* Ap4OdafAtom.cpp in Sources */,
 				CA9366EB0B437D040067D50B /* Ap4OddaAtom.cpp in Sources */,
 				CA9366ED0B437D040067D50B /* Ap4OdheAtom.cpp in Sources */,
@@ -3856,6 +3931,7 @@
 				CA9367180B437D040067D50B /* Ap4SttsAtom.cpp in Sources */,
 				CA93671A0B437D040067D50B /* Ap4SyntheticSampleTable.cpp in Sources */,
 				CA93671C0B437D040067D50B /* Ap4TimsAtom.cpp in Sources */,
+				2DEEB6E629D79E7000B97936 /* Ap4LablAtom.cpp in Sources */,
 				CA93671E0B437D040067D50B /* Ap4TkhdAtom.cpp in Sources */,
 				CA9367200B437D040067D50B /* Ap4Track.cpp in Sources */,
 				CA9367220B437D040067D50B /* Ap4TrakAtom.cpp in Sources */,
@@ -3865,7 +3941,9 @@
 				CA93672E0B437D040067D50B /* Ap4VmhdAtom.cpp in Sources */,
 				CA9367350B437D1D0067D50B /* Ap4AesBlockCipher.cpp in Sources */,
 				CA9367370B437D1D0067D50B /* Ap4StreamCipher.cpp in Sources */,
+				2DEEB70329DC87AC00B97936 /* Ap4ArdiAtom.cpp in Sources */,
 				CA93673C0B437D390067D50B /* Ap4MetaData.cpp in Sources */,
+				2DEEB70029DC87AC00B97936 /* Ap4ElngAtom.cpp in Sources */,
 				CA9367FE0B4383F00067D50B /* Ap4AdtsParser.cpp in Sources */,
 				CA9368000B4383F00067D50B /* Ap4BitStream.cpp in Sources */,
 				F9B1F4FB0B54AD91003F147E /* Ap4AvccAtom.cpp in Sources */,
@@ -3883,6 +3961,7 @@
 				CAEDC8E80DFF5B1100F070A8 /* Ap4Expandable.cpp in Sources */,
 				CAEDC8FB0DFF61AE00F070A8 /* Ap4Command.cpp in Sources */,
 				CAEF5D2F19EB26DC007B66A8 /* Ap4SbgpAtom.cpp in Sources */,
+				2D8B5CB629F08EAB00995769 /* Ap4AedbAtom.cpp in Sources */,
 				CAEA9E990E17006D008C396D /* Ap4GrpiAtom.cpp in Sources */,
 				CA0BBBA10F38D10A00DF01DD /* Ap4Results.cpp in Sources */,
 				CA8B6A620F66D20900720A07 /* Ap4MfhdAtom.cpp in Sources */,
@@ -3917,10 +3996,13 @@
 				CA91A7D71A364BE80057C7B2 /* Ap4SthdAtom.cpp in Sources */,
 				CA5734EE13B5DBB100953446 /* Ap4SaizAtom.cpp in Sources */,
 				CA5734FD13B5DCFA00953446 /* Ap4SencAtom.cpp in Sources */,
+				2DEEB70429DC87AC00B97936 /* Ap4KindAtom.cpp in Sources */,
+				2D8B5CB829F08EAB00995769 /* Ap4AeprAtom.cpp in Sources */,
 				CA15E16D1467D01A00D4EC8B /* Ap4PdinAtom.cpp in Sources */,
 				CAF0104915343D5D00CCD976 /* Ap4AinfAtom.cpp in Sources */,
 				CAA55DAB20F1305900CBAA11 /* Ap4Dac4Atom.cpp in Sources */,
 				CAF0104B15343D5D00CCD976 /* Ap4BlocAtom.cpp in Sources */,
+				2D8B5CB729F08EAB00995769 /* Ap4AeppAtom.cpp in Sources */,
 				CA094DB418D80E220032290E /* Ap4HvccAtom.cpp in Sources */,
 				CAF0104F15343E4000CCD976 /* Ap4PsshAtom.cpp in Sources */,
 			);
@@ -4341,7 +4423,11 @@
 		1DEB91EC08733DB70010E9CD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				"MACOSX_DEPLOYMENT_TARGET[arch=*]" = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4;
 			};
 			name = Debug;
@@ -4349,7 +4435,11 @@
 		1DEB91ED08733DB70010E9CD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				"MACOSX_DEPLOYMENT_TARGET[arch=*]" = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4;
 			};
 			name = Release;
@@ -4358,23 +4448,29 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -4392,7 +4488,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = NO;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				ONLY_ACTIVE_ARCH = YES;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx";
 				VALID_ARCHS = "arm64 arm64e i386 x86_64";
@@ -4405,22 +4502,28 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
@@ -4446,6 +4549,9 @@
 		CA00667510153953004C0D5F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42ts;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4454,6 +4560,9 @@
 		CA00667610153953004C0D5F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42ts;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4474,6 +4583,7 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -4486,6 +4596,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				PRODUCT_NAME = mp4pssh;
 				SUPPORTED_PLATFORMS = macosx;
@@ -4507,6 +4618,7 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -4516,6 +4628,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_NAME = mp4pssh;
 				SUPPORTED_PLATFORMS = macosx;
@@ -4526,11 +4639,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = DEBUG;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4compact;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4540,9 +4656,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4compact;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4551,6 +4670,9 @@
 		CA2E6A3D1087E09400F837E2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42avc;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4559,6 +4681,9 @@
 		CA2E6A3E1087E09400F837E2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42avc;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4568,9 +4693,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = aac2mp4;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4580,7 +4708,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_MODEL_TUNING = G5;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = aac2mp4;
 				SUPPORTED_PLATFORMS = macosx;
 				ZERO_LINK = NO;
@@ -4590,6 +4721,9 @@
 		CA3EDA800D7E0B81007AE943 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = avcinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4598,6 +4732,9 @@
 		CA3EDA810D7E0B81007AE943 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = avcinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4606,6 +4743,9 @@
 		CA40CB2B0F40DC100008649B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BasicTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4614,6 +4754,9 @@
 		CA40CB2C0F40DC100008649B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BasicTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4622,6 +4765,9 @@
 		CA44C52C0D46375F00173F5F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4dcfpackager;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4630,6 +4776,9 @@
 		CA44C52D0D46375F00173F5F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4dcfpackager;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4639,9 +4788,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				OTHER_LDFLAGS = (
 					"-framework",
 					Foundation,
@@ -4657,7 +4809,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_MODEL_TUNING = G5;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				OTHER_LDFLAGS = (
 					"-framework",
 					Foundation,
@@ -4673,6 +4828,9 @@
 		CA646ABD0CE97BFE009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4dump;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4681,6 +4839,9 @@
 		CA646ABE0CE97BFE009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4dump;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4689,6 +4850,9 @@
 		CA646AC60CE97C47009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Apps;
 			};
 			name = Debug;
@@ -4696,6 +4860,9 @@
 		CA646AC70CE97C47009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Apps;
 			};
 			name = Release;
@@ -4703,6 +4870,9 @@
 		CA646AD30CE97C80009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4info;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4711,6 +4881,9 @@
 		CA646AD40CE97C80009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4info;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4719,6 +4892,9 @@
 		CA646AE80CE97CD2009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4encrypt;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4727,6 +4903,9 @@
 		CA646AE90CE97CD2009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4encrypt;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4735,7 +4914,9 @@
 		CA646AF50CE97CEE009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4decrypt;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4744,7 +4925,9 @@
 		CA646AF60CE97CEE009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4decrypt;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4753,6 +4936,9 @@
 		CA646B080CE97D6E009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4edit;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4761,6 +4947,9 @@
 		CA646B090CE97D6E009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4edit;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4769,6 +4958,9 @@
 		CA646B180CE97D9C009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4extract;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4777,6 +4969,9 @@
 		CA646B190CE97D9C009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4extract;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4785,6 +4980,9 @@
 		CA646B280CE97DD1009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4tag;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4793,6 +4991,9 @@
 		CA646B290CE97DD1009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4tag;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4801,6 +5002,9 @@
 		CA646B480CE97E27009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42aac;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4809,6 +5013,9 @@
 		CA646B490CE97E27009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42aac;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4817,6 +5024,9 @@
 		CA646B580CE97E52009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4rtphintinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4825,6 +5035,9 @@
 		CA646B590CE97E52009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4rtphintinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4833,6 +5046,9 @@
 		CA646B680CE97E82009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = cryptotest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4841,6 +5057,9 @@
 		CA646B690CE97E82009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = cryptotest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4849,6 +5068,9 @@
 		CA646B830CE97EF7009699D7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Tests;
 			};
 			name = Debug;
@@ -4856,6 +5078,9 @@
 		CA646B840CE97EF7009699D7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Tests;
 			};
 			name = Release;
@@ -4863,6 +5088,9 @@
 		CA7EECE70F720649009F85F9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = CompareFilesTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4871,6 +5099,9 @@
 		CA7EECE80F720649009F85F9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = CompareFilesTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4890,6 +5121,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
@@ -4902,6 +5134,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4921,6 +5154,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -4930,6 +5164,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -4952,6 +5187,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -4962,6 +5198,7 @@
 				);
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = mp4diff;
@@ -4987,12 +5224,14 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_NAME = mp4diff;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5017,6 +5256,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -5026,6 +5266,7 @@
 				);
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = mp4iframeindex;
@@ -5050,11 +5291,13 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_NAME = mp4iframeindex;
 				SDKROOT = macosx;
@@ -5075,6 +5318,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
@@ -5087,6 +5331,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4mux;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5106,6 +5351,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -5115,6 +5361,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4mux;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5124,9 +5371,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = PassthroughWriterTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5136,7 +5386,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_MODEL_TUNING = G5;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = PassthroughWriterTest;
 				SUPPORTED_PLATFORMS = macosx;
 				ZERO_LINK = NO;
@@ -5147,12 +5400,15 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				INSTALL_PATH = /usr/local/lib;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				NEPTUNE_HOME = "$(SRCROOT)/../../../../Neptune";
 				PRODUCT_NAME = Bento4Neptune;
 				USER_HEADER_SEARCH_PATHS = "$(NEPTUNE_HOME)/**";
@@ -5163,10 +5419,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				NEPTUNE_HOME = "$(SRCROOT)/../../../../Neptune";
 				PRODUCT_NAME = Bento4Neptune;
 				USER_HEADER_SEARCH_PATHS = "$(NEPTUNE_HOME)/**";
@@ -5177,6 +5436,9 @@
 		CAA97B390CF4D54E00C01909 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = All;
 			};
 			name = Debug;
@@ -5184,6 +5446,9 @@
 		CAA97B3A0CF4D54E00C01909 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = All;
 			};
 			name = Release;
@@ -5191,6 +5456,9 @@
 		CAB3CB730FCB35B8007C4260 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BufferedStreamTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5199,6 +5467,9 @@
 		CAB3CB740FCB35B8007C4260 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BufferedStreamTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5207,6 +5478,9 @@
 		CABB61F50F02BABC00B53D31 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = TracksTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5215,6 +5489,9 @@
 		CABB61F60F02BABC00B53D31 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = TracksTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5224,9 +5501,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4split;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5236,7 +5516,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_MODEL_TUNING = G5;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4split;
 				SUPPORTED_PLATFORMS = macosx;
 				ZERO_LINK = NO;
@@ -5247,8 +5530,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
@@ -5258,6 +5543,7 @@
 				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4audioclip;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5267,12 +5553,15 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp4audioclip;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5281,6 +5570,9 @@
 		CAE1FBF41AF8493E00607B3C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42hls;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5289,6 +5581,9 @@
 		CAE1FBF51AF8493E00607B3C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42hls;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5297,6 +5592,9 @@
 		CAE724080FC33646008F2905 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = LinearReaderTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5305,6 +5603,9 @@
 		CAE724090FC33646008F2905 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = LinearReaderTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5314,7 +5615,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ATOMIX_HOME = "$(SRCROOT)/../../../../Atomix";
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4Atomix;
 				USER_HEADER_SEARCH_PATHS = "$(ATOMIX_HOME)/**";
 			};
@@ -5324,7 +5628,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ATOMIX_HOME = "$(SRCROOT)/../../../../Atomix";
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4Atomix;
 				USER_HEADER_SEARCH_PATHS = "$(ATOMIX_HOME)/**";
 			};
@@ -5333,6 +5640,9 @@
 		CAF4792D0F0951B9004073ED /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BenchmarksTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5341,6 +5651,9 @@
 		CAF4792E0F0951B9004073ED /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = BenchmarksTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5360,6 +5673,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
@@ -5372,6 +5686,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = hevcinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5391,6 +5706,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -5400,6 +5716,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = hevcinfo;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5419,6 +5736,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
@@ -5431,6 +5749,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42hevc;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5450,6 +5769,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -5459,6 +5779,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = mp42hevc;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5467,6 +5788,9 @@
 		CAFC31BB0FEB3DDE00EF80A0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = FragmentParserTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5475,6 +5799,9 @@
 		CAFC31BC0FEB3DDE00EF80A0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = FragmentParserTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5500,6 +5827,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -5514,6 +5842,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -5541,6 +5870,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -5551,6 +5881,7 @@
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -5560,6 +5891,9 @@
 		F9DBC7FF0E99AFE200913BF6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = AvcTrackWriterTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5568,6 +5902,9 @@
 		F9DBC8000E99AFE200913BF6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = AvcTrackWriterTest;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5576,10 +5913,13 @@
 		F9FDDA2F0EA799000061DCB2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4C;
 				SUPPORTED_PLATFORMS = macosx;
 			};
@@ -5588,10 +5928,13 @@
 		F9FDDA300EA799000061DCB2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = Bento4C;
 				SUPPORTED_PLATFORMS = macosx;
 			};

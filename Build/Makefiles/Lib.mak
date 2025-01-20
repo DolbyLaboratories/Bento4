@@ -126,6 +126,17 @@ CORE_SOURCES = 								\
     Ap4DvccAtom.cpp                         \
     Ap4SgpdAtom.cpp                         \
     Ap4SbgpAtom.cpp                         \
+    Ap4LablAtom.cpp                         \
+    Ap4PrslAtom.cpp                         \
+    Ap4ElngAtom.cpp                         \
+    Ap4KindAtom.cpp                         \
+    Ap4ArdiAtom.cpp                         \
+    Ap4ChnlAtom.cpp                         \
+    Ap4AedbAtom.cpp                         \
+    Ap4AeppAtom.cpp                         \
+    Ap4AeprAtom.cpp                         \
+    Ap4AesdAtom.cpp                         \
+    Ap4AesdAtom.cpp                         \
     Ap4NalParser.cpp                        \
     Ap4Ac4Parser.cpp                        \
     Ap4AvcParser.cpp                        \
