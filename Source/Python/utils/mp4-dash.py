@@ -125,6 +125,7 @@ CENC_2013_NAMESPACE         = 'urn:mpeg:cenc:2013'
 DASHIF_NAMESPACE            = 'https://dashif.org/'
 
 DASH_DEFAULT_ROLE_NAMESPACE = 'urn:mpeg:dash:role:2011'
+HTML_DEFAULT_KIND_NAMESPACE = 'about:html-kind'
 
 DASH_MEDIA_SEGMENT_URL_PATTERN_SMOOTH = "/QualityLevels($Bandwidth$)/Fragments(%s=$Time$)"
 DASH_MEDIA_SEGMENT_URL_PATTERN_HIPPO  = '%s/Bitrate($Bandwidth$)/Fragment($Time$)'
@@ -409,7 +410,7 @@ def AddDescriptor(adaptation_set, set_attributes, set_name, category_name):
                 sys.stderr.write('WARNING: ignoring ' + descriptor_name + ' descriptor for set "' + set_name + '", the schemeIdUri must be specified\n')
 
 #############################################
-def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, subtitles_files):
+def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, subtitles_files, preselection_sets):
     all_audio_tracks     = sum(list(audio_sets.values()),     [])
     all_video_tracks     = sum(list(video_sets.values()),     [])
     all_subtitles_tracks = sum(list(subtitles_sets.values()), [])
@@ -438,6 +439,15 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
     mpd.append(xml.Comment(' Created with Bento4 mp4-dash.py, VERSION=' + VERSION + '-' + SDK_REVISION + ' '))
     period = xml.SubElement(mpd, 'Period')
 
+    # Collect all entities referenced by preselections
+    preselection_entities = []
+    if preselection_sets:
+        for preselection in preselection_sets:
+            preselection_entry = preselection_sets[preselection]
+            for entity in preselection_entry.entities_in_group:
+                if entity not in preselection_entities:
+                    preselection_entities.append(entity)
+
     # process the video tracks
     if video_sets:
         period.append(xml.Comment(' Video '))
@@ -450,8 +460,11 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                 if video_track.width  > maxWidth:  maxWidth  = video_track.width
                 if video_track.height > maxHeight: maxHeight = video_track.height
 
+            id = video_tracks[0].id
+
             adaptation_set = xml.SubElement(period,
                                             'AdaptationSet',
+                                            id=id,
                                             mimeType=VIDEO_MIMETYPE,
                                             segmentAlignment='true',
                                             startWithSAP='1',
@@ -499,6 +512,13 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                     xml.SubElement(segment_base, 'Initialization', range=str(init_range[0])+'-'+str(init_range[1]))
                 else:
                     AddSegments(options, representation, video_track)
+            # Tag if AdaptationSet is used by Preselection
+            if (id != 0) and (id in preselection_entities):
+                # TODO: When to tag with 'EssentialProperty'? Will prevent playback outside of preselection set.
+                if 0:
+                    xml.SubElement(adaptation_set, 'EssentialProperty', schemeIdUri='urn:mpeg:dash:preselection:2016', value='')
+                else:
+                    xml.SubElement(adaptation_set, 'SupplementalProperty', schemeIdUri='urn:mpeg:dash:preselection:2016', value='')
 
     # process the audio tracks
     if audio_sets:
@@ -513,6 +533,9 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
             label = audio_tracks[0].label
             if label != '':
                 kwargs['label'] = label
+            id = audio_tracks[0].id
+            if id != 0:
+                kwargs['id'] = str(id)
             adaptation_set = xml.SubElement(*args, **kwargs)
 
             # see if we have descriptors
@@ -590,6 +613,13 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                     xml.SubElement(segment_base, 'Initialization', range=str(init_range[0])+'-'+str(init_range[1]))
                 else:
                     AddSegments(options, representation, audio_track)
+            # Tag if AdaptationSet is used by Preselection
+            if (id != 0) and (id in preselection_entities):
+                # TODO: When to tag with 'EssentialProperty'? Will prevent playback outside of preselection set.
+                if 0:
+                    xml.SubElement(adaptation_set, 'EssentialProperty', schemeIdUri='urn:mpeg:dash:preselection:2016', value='')
+                else:
+                    xml.SubElement(adaptation_set, 'SupplementalProperty', schemeIdUri='urn:mpeg:dash:preselection:2016', value='')
 
     # process all the subtitles tracks
     if subtitles_sets:
@@ -663,6 +693,109 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                                             bandwidth=str(bandwidth))
             base_url = xml.SubElement(representation, 'BaseURL')
             base_url.text = 'subtitles/'+subtitles_file.language+'/'+subtitles_file.media_name
+
+    if preselection_sets:
+        period.append(xml.Comment(' Preselection '))
+        for preselection in preselection_sets:
+            preselection_entry = preselection_sets[preselection]
+
+            kwargs = {}
+            group_id = preselection
+            # group_id = preselection_entry.group_id # superfluous
+            if group_id != 0:
+                kwargs['id'] = str(group_id)
+            preselectionComponents = " ".join(str(x) for x in preselection_entry.entities_in_group)
+            if preselectionComponents != '':
+                kwargs['preselectionComponents'] = preselectionComponents
+            language = preselection_entry.extended_language
+            if (language != '') and (language != 'und'):
+                kwargs['lang'] = language
+            if hasattr(preselection_entry,'tag'):
+                kwargs['tag'] = preselection_entry.tag # corresponds to presentation_id in ac4_presentation_v1_dsi
+            if hasattr(preselection_entry,'selectionPriority'):
+                kwargs['selectionPriority'] = str(preselection_entry.selection_priority)
+            # TODO determine 'order' attribute if Preselection contains multiple AdaptationSets/Tracks
+            preselection = xml.SubElement(period, 'Preselection', **kwargs)
+
+            # WIP: AudioChannelConfiguration with new URI from audio_rendering_indications (there can at most be one)
+            if preselection_entry.audio_rendering_indications:
+                ardi_uri = 'tag:dolby.com,2018:dash:audio_rendering_indication:2024'
+                ardi = preselection_entry.audio_rendering_indications[0].audio_rendering_indication
+                label = preselection_entry.audio_rendering_indications[0].description[ardi]
+                xml.SubElement(preselection, 'AudioChannelConfiguration', schemeIdUri=ardi_uri, value=str(ardi), comment=label)
+
+            # TODO add AudioChannelConfiguration from channel_layout?
+            if 0:
+                acc_uri = MPEG_DASH_AUDIO_CHANNEL_CONFIGURATION_SCHEME_ID_URI
+                ardi_acc = ''
+                acc = ardi_acc[ardi]
+                if acc:
+                    xml.SubElement(preselection, 'AudioChannelConfiguration', schemeIdUri=acc_uri, value=acc)
+
+            # Add GroupLabel from labels (before Label)
+            for label in preselection_entry.labels:
+                args = [preselection]
+                kwargs = {}
+                if label.is_group_label:
+                    args.append('GroupLabel')
+                else:
+                    continue
+                kwargs['id'] = str(label.label_id)
+                kwargs['lang'] = label.language
+                lbl = xml.SubElement(*args, **kwargs)
+                lbl.text = label.label
+
+            # Add Label from labels (after GroupLabel)
+            for label in preselection_entry.labels:
+                args = [preselection]
+                kwargs = {}
+                if label.is_group_label:
+                    continue
+                args.append('Label')
+                kwargs['id'] = str(label.label_id)
+                kwargs['lang'] = label.language
+                lbl = xml.SubElement(*args, **kwargs)
+                lbl.text = label.label
+
+            # Add Role/Accessibility from kinds
+            for kind in preselection_entry.kinds:
+                dash_roles = ['caption', 'subtitle', 'main', 'alternate', 'supplementary', 'commentary', 'dub', 'description', 'sign', 'metadata', 'enhanced-audio-intelligibility', 'emergency', 'forced-subtitle', 'easyreader', 'karaoke']
+                html_roles = ['alternative', 'commentary', 'captions', 'descriptions', 'main', 'main-desc', 'sign', 'subtitles', 'translation', 'commentary', '', 'chapters', 'metadata']
+                role_uri = kind.schemeURI
+                role = kind.value
+                accessibility = ''
+                # Validate URI
+                if role_uri == '':
+                    if role in dash_roles:
+                        role_uri = DASH_DEFAULT_ROLE_NAMESPACE
+                    elif role in html_roles:
+                        role_uri = HTML_DEFAULT_KIND_NAMESPACE
+                # Special-case descriptors for DE
+                if (role_uri == "urn:mpeg:dash:descriptor:2025"):
+                    fragment = xml.fromstring(kind.value)
+                    preselection.append(fragment)
+                    role = None
+                # Validate Role, determine Accessibility (if any)
+                elif ((role_uri != DASH_DEFAULT_ROLE_NAMESPACE) or (role.lower() in dash_roles)) and ((role_uri != HTML_DEFAULT_KIND_NAMESPACE) or (role.lower() in html_roles)): # Skip invalid DASH/HTML Roles
+                    if role_uri == DASH_DEFAULT_ROLE_NAMESPACE: # Handle DASH Role special cases TODO: only for AC-4?
+                        if role in ['description', 'enhanced-audio-intelligibility']:
+                            accessibility = role
+                            role = 'alternate'
+                        if role not in ['main', 'alternate', 'supplementary', 'commentary', 'dub', 'emergency']:
+                            role = ''
+                # Add elements, Accessibility first, Role second
+                if accessibility:
+                    xml.SubElement(preselection, 'Accessibility', schemeIdUri=role_uri, value=accessibility)
+                    if accessibility == 'description': # Add DVB compatible element
+                        acc_uri = 'urn:tva:metadata:cs:AudioPurposeCS:2007'
+                        accessibility = '1'
+                        xml.SubElement(preselection, 'Accessibility', schemeIdUri=acc_uri, value=accessibility)
+                if role:
+                    xml.SubElement(preselection, 'Role', schemeIdUri=role_uri, value=role)
+
+            # TODO Rating
+            # TODO Viewpoint
+            # TODO more items?
 
     # save the MPD
     if options.mpd_filename:
@@ -1357,6 +1490,7 @@ def SelectTracks(options, media_sources):
     audio_adaptation_sets     = {}
     video_adaptation_sets     = {}
     subtitles_adaptation_sets = {}
+    preselection_sets         = {}
     label_indexes             = {}
     for media_source in media_sources:
         track_id       = media_source.spec['track']
@@ -1496,7 +1630,11 @@ def SelectTracks(options, media_sources):
                 adaptation_set[prefix] = adaptation_set[name]
                 del adaptation_set[name]
 
-    return (audio_adaptation_sets, video_adaptation_sets, subtitles_adaptation_sets, mp4_files)
+    preselections = list(media_source.mp4_file.preselections.values())
+    for preselection in preselections:
+        preselection_sets[preselection.group_id] = preselection
+
+    return (audio_adaptation_sets, video_adaptation_sets, subtitles_adaptation_sets, preselection_sets, mp4_files)
 
 #############################################
 def SelectSubtitlesFiles(options, media_sources):
@@ -2013,7 +2151,7 @@ def main():
 
     # for on-demand, we need to first extract tracks into individual media files
     if options.on_demand:
-        (audio_sets, video_sets, subtitles_sets, mp4_files) = SelectTracks(options, media_sources)
+        (audio_sets, video_sets, subtitles_sets, preselection_sets, mp4_files) = SelectTracks(options, media_sources)
         media_sources = [x for x in media_sources if x.format == "webvtt"] # Keep subtitles
         for track in sum(list(audio_sets.values()) + list(video_sets.values()), []):
             print('Extracting track', track.id, 'from', GetMappedFileName(track.parent.media_source.filename))
@@ -2043,7 +2181,7 @@ def main():
     EncryptSources(options, media_sources)
 
     # parse the media sources and select the audio and video tracks
-    (audio_sets, video_sets, subtitles_sets, mp4_files) = SelectTracks(options, media_sources)
+    (audio_sets, video_sets, subtitles_sets, preselection_sets, mp4_files) = SelectTracks(options, media_sources)
     subtitles_files = SelectSubtitlesFiles(options, media_sources)
 
     # store lists of all tracks by type
@@ -2063,6 +2201,7 @@ def main():
         print('Audio:',     audio_sets)
         print('Video:',     video_sets)
         print('Subtitles:', subtitles_sets)
+        print('Preselections:', preselection_sets)
 
         for track in audio_tracks + video_tracks + subtitles_tracks:
             message = 'Key info for ' + str(track) + ': '
@@ -2229,7 +2368,7 @@ def main():
                 shutil.copyfile(subtitles_file.media_source.filename, media_filename)
 
     # output the DASH MPD
-    OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, subtitles_files)
+    OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, subtitles_files, preselection_sets)
 
     # output the HLS playlists
     if options.hls:
