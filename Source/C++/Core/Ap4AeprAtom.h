@@ -1,6 +1,6 @@
 /*****************************************************************
 |
-|    AP4 - Shared Types
+|    AP4 - Audio Element Prominence Interactivity Atoms 
 |
 |    Copyright 2002-2008 Axiomatic Systems, LLC
 |
@@ -26,52 +26,46 @@
 |
  ****************************************************************/
 
-#ifndef _AP4_TYPES_H_
-#define _AP4_TYPES_H_
+#ifndef _AP4_AEPR_ATOM_H_
+#define _AP4_AEPR_ATOM_H_
 
 /*----------------------------------------------------------------------
 |   includes
 +---------------------------------------------------------------------*/
-#include "Ap4Config.h"
+#include "Ap4Atom.h"
+#include "Ap4String.h"
 
 /*----------------------------------------------------------------------
-|   types
+|   AP4_AeprAtom
 +---------------------------------------------------------------------*/
-typedef int            AP4_Result;
-typedef unsigned int   AP4_Flags;
-typedef unsigned int   AP4_Mask;
-typedef unsigned int   AP4_Cardinal;
-typedef unsigned int   AP4_Ordinal;
-typedef unsigned int   AP4_UI32;
-typedef signed   int   AP4_SI32;
-typedef unsigned short AP4_UI16;
-typedef signed   short AP4_SI16;
-typedef unsigned char  AP4_UI08;
-typedef signed   char  AP4_SI08;
-typedef AP4_UI08       AP4_Byte;
-typedef AP4_UI32       AP4_Size;
+class AP4_AeprAtom : public AP4_Atom
+{
+public:
+    AP4_IMPLEMENT_DYNAMIC_CAST_D(AP4_AeprAtom, AP4_Atom)
 
-// the rest depends on whether the platform supports 64-bit integers
-#if defined(AP4_CONFIG_HAVE_INT64)
-    // we have 64-bit integers
-    typedef AP4_CONFIG_INT64_TYPE          AP4_SI64;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_UI64;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_LargeSize;
-    typedef AP4_CONFIG_INT64_TYPE          AP4_Offset;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_Position;
-#else
-    // use only 32-bit integers
-    typedef struct {
-        AP4_UI32 hi;
-        AP4_UI32 lo;
-    } AP4_UI64, AP4_SI64;
-    typedef unsigned long  AP4_LargeSize;
-    typedef long           AP4_Offset;
-    typedef unsigned long  AP4_Position;
-#endif
+    // class methods
+    static AP4_AeprAtom* Create(AP4_Size size, AP4_ByteStream& stream);
 
-#ifndef NULL
-#define NULL 0
-#endif
+    // methods
+    AP4_AeprAtom(float     min_prominence,
+                 float     max_prominence,
+                 float     default_prominence);
+    virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);
+    virtual AP4_Result WriteFields(AP4_ByteStream& stream);
 
-#endif // _AP4_TYPES_H_
+private:
+    // methods
+    AP4_AeprAtom(AP4_UI32        size,
+                 AP4_UI08        version,
+                 AP4_UI32        flags,
+                 AP4_ByteStream& stream);
+    float FloatFromInt(AP4_UI32 value);
+    AP4_UI32 IntFromFloat(float value);
+
+    // members
+    float      m_MinProminence;
+    float      m_MaxProminence;
+    float      m_DefaultProminence;
+};
+
+#endif // _AP4_AEPR_ATOM_H_

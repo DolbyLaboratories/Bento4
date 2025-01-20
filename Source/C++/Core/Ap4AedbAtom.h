@@ -1,6 +1,6 @@
 /*****************************************************************
 |
-|    AP4 - Shared Types
+|    AP4 - Audio Element Description Atoms 
 |
 |    Copyright 2002-2008 Axiomatic Systems, LLC
 |
@@ -26,52 +26,48 @@
 |
  ****************************************************************/
 
-#ifndef _AP4_TYPES_H_
-#define _AP4_TYPES_H_
+#ifndef _AP4_AEDB_ATOM_H_
+#define _AP4_AEDB_ATOM_H_
 
 /*----------------------------------------------------------------------
 |   includes
 +---------------------------------------------------------------------*/
-#include "Ap4Config.h"
+#include "Ap4Atom.h"
+#include "Ap4String.h"
+#include "Ap4ContainerAtom.h"
 
 /*----------------------------------------------------------------------
-|   types
+|   AP4_AedbAtom
 +---------------------------------------------------------------------*/
-typedef int            AP4_Result;
-typedef unsigned int   AP4_Flags;
-typedef unsigned int   AP4_Mask;
-typedef unsigned int   AP4_Cardinal;
-typedef unsigned int   AP4_Ordinal;
-typedef unsigned int   AP4_UI32;
-typedef signed   int   AP4_SI32;
-typedef unsigned short AP4_UI16;
-typedef signed   short AP4_SI16;
-typedef unsigned char  AP4_UI08;
-typedef signed   char  AP4_SI08;
-typedef AP4_UI08       AP4_Byte;
-typedef AP4_UI32       AP4_Size;
+class AP4_AedbAtom : public AP4_ContainerAtom
+{
+public:
+    AP4_IMPLEMENT_DYNAMIC_CAST_D(AP4_AedbAtom, AP4_ContainerAtom)
 
-// the rest depends on whether the platform supports 64-bit integers
-#if defined(AP4_CONFIG_HAVE_INT64)
-    // we have 64-bit integers
-    typedef AP4_CONFIG_INT64_TYPE          AP4_SI64;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_UI64;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_LargeSize;
-    typedef AP4_CONFIG_INT64_TYPE          AP4_Offset;
-    typedef unsigned AP4_CONFIG_INT64_TYPE AP4_Position;
-#else
-    // use only 32-bit integers
-    typedef struct {
-        AP4_UI32 hi;
-        AP4_UI32 lo;
-    } AP4_UI64, AP4_SI64;
-    typedef unsigned long  AP4_LargeSize;
-    typedef long           AP4_Offset;
-    typedef unsigned long  AP4_Position;
-#endif
+    // class methods
+    static AP4_AedbAtom* Create(AP4_Size size,
+                                AP4_ByteStream& stream,
+                                AP4_AtomFactory& atom_factory);
 
-#ifndef NULL
-#define NULL 0
-#endif
+    // methods
+    AP4_AedbAtom(const char* audio_element_tag,
+                 AP4_Flags   is_toggleable,
+                 AP4_Flags   is_default_enabled);
+    virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);
+    virtual AP4_Result WriteFields(AP4_ByteStream& stream);
 
-#endif // _AP4_TYPES_H_
+private:
+    // methods
+    AP4_AedbAtom(AP4_UI32         size,
+                 AP4_UI08         version,
+                 AP4_UI32         flags,
+                 AP4_ByteStream&  stream,
+                 AP4_AtomFactory& atom_factory);
+
+    // members
+    AP4_String m_audioElementTag;
+    AP4_Flags  m_isToggleable;
+    AP4_Flags  m_isDefaultEnabled;
+};
+
+#endif // _AP4_AEDB_ATOM_H_
