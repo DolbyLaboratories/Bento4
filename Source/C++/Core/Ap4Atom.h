@@ -588,6 +588,21 @@ const AP4_Atom::Type AP4_ATOM_TYPE_SIDX = AP4_ATOM_TYPE('s','i','d','x');
 const AP4_Atom::Type AP4_ATOM_TYPE_SSIX = AP4_ATOM_TYPE('s','s','i','x');
 const AP4_Atom::Type AP4_ATOM_TYPE_SBGP = AP4_ATOM_TYPE('s','b','g','p');
 const AP4_Atom::Type AP4_ATOM_TYPE_SGPD = AP4_ATOM_TYPE('s','g','p','d');
+const AP4_Atom::Type AP4_ATOM_TYPE_LABL = AP4_ATOM_TYPE('l','a','b','l');
+const AP4_Atom::Type AP4_ATOM_TYPE_TRGR = AP4_ATOM_TYPE('t','r','g','r');
+const AP4_Atom::Type AP4_ATOM_TYPE_TKGD = AP4_ATOM_TYPE('t','k','g','d');
+const AP4_Atom::Type AP4_ATOM_TYPE_PRSL = AP4_ATOM_TYPE('p','r','s','l');
+const AP4_Atom::Type AP4_ATOM_TYPE_ELNG = AP4_ATOM_TYPE('e','l','n','g');
+const AP4_Atom::Type AP4_ATOM_TYPE_ARDI = AP4_ATOM_TYPE('a','r','d','i');
+const AP4_Atom::Type AP4_ATOM_TYPE_KIND = AP4_ATOM_TYPE('k','i','n','d');
+const AP4_Atom::Type AP4_ATOM_TYPE_CHNL = AP4_ATOM_TYPE('c','h','n','l');
+const AP4_Atom::Type AP4_ATOM_TYPE_AELM = AP4_ATOM_TYPE('a','e','l','m');
+const AP4_Atom::Type AP4_ATOM_TYPE_AEDB = AP4_ATOM_TYPE('a','e','d','b');
+const AP4_Atom::Type AP4_ATOM_TYPE_AEPP = AP4_ATOM_TYPE('a','e','p','p');
+const AP4_Atom::Type AP4_ATOM_TYPE_AEPR = AP4_ATOM_TYPE('a','e','p','r');
+const AP4_Atom::Type AP4_ATOM_TYPE_AESB = AP4_ATOM_TYPE('a','e','s','b');
+const AP4_Atom::Type AP4_ATOM_TYPE_AESD = AP4_ATOM_TYPE('a','e','s','d');
+const AP4_Atom::Type AP4_ATOM_TYPE_GRPL = AP4_ATOM_TYPE('g','r','p','l');
 
 /*----------------------------------------------------------------------
 |   AP4_AtomListInspector
