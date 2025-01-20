@@ -67,6 +67,7 @@ AP4_FileWriter::Write(AP4_File& file, AP4_ByteStream& stream, Interleaving /* in
     // get the movie object (and stop if there isn't any)
     AP4_Movie* movie = file.GetMovie();
     if (movie == NULL) return AP4_SUCCESS;
+    AP4_ContainerAtom* meta = movie->GetMetaAtom();
 
     // see how much we've written so far
     AP4_Position position;
@@ -101,6 +102,9 @@ AP4_FileWriter::Write(AP4_File& file, AP4_ByteStream& stream, Interleaving /* in
     unsigned int t=0;
     AP4_Result result = AP4_SUCCESS;
     AP4_UI64   mdat_position = position+movie->GetMoovAtom()->GetSize();
+    if (meta != NULL) {
+        mdat_position += meta->GetSize();
+    }
     AP4_Array<AP4_Array<AP4_UI64>*> trak_chunk_offsets_backup;
     AP4_Array<AP4_UI64>             chunk_offsets;
     for (AP4_List<AP4_Track>::Item* track_item = movie->GetTracks().FirstItem();
@@ -137,8 +141,9 @@ AP4_FileWriter::Write(AP4_File& file, AP4_ByteStream& stream, Interleaving /* in
         result = trak->SetChunkOffsets(chunk_offsets);
     }
     
-    // write the moov atom
+    // write the moov and meta (if present) atoms
     movie->GetMoovAtom()->Write(stream);
+    if (meta != NULL) meta->Write(stream);
     
     // create and write the media data (mdat)
     if (mdat_is_large) {

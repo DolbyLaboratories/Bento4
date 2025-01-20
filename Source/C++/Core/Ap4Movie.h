@@ -61,6 +61,8 @@ public:
 
     AP4_MoovAtom* GetMoovAtom() { return m_MoovAtom;}
     AP4_MvhdAtom* GetMvhdAtom() { return m_MvhdAtom;}
+    AP4_ContainerAtom* CreateMetaAtom();
+    AP4_ContainerAtom* GetMetaAtom() { return m_MetaAtom;}
     AP4_List<AP4_Track>& GetTracks() { return m_Tracks; }
     AP4_Track*   GetTrack(AP4_UI32 track_id);
     AP4_Track*   GetTrack(AP4_Track::Type type, AP4_Ordinal index = 0);
@@ -75,6 +77,7 @@ private:
     AP4_MoovAtom*       m_MoovAtom;
     bool                m_MoovAtomIsOwned;
     AP4_MvhdAtom*       m_MvhdAtom;
+    AP4_ContainerAtom*  m_MetaAtom;
     AP4_List<AP4_Track> m_Tracks;
 };
 

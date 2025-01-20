@@ -2393,6 +2393,19 @@ main(int argc, char** argv)
     }
 
     movie->GetMvhdAtom()->SetNextTrackId(movie->GetTracks().ItemCount() + 1);
+    
+    // Preselections: Adding Track Group Description, stored in top-level META atom, if any were created
+    if (preselection_index > 0) {
+        // Create META Atom in Movie
+        AP4_ContainerAtom* meta = movie->CreateMetaAtom();
+        
+        // Create a NULL-Handler Atom
+        AP4_HdlrAtom* hdlr = new AP4_HdlrAtom(AP4_HANDLER_TYPE_NULL, "NULL Handler");
+        meta->AddChild(hdlr);
+        
+        // Add GRPL child to META
+        meta->AddChild(grpl);
+    }
 
     // open the output
     AP4_ByteStream* output = NULL;

@@ -92,7 +92,8 @@ PrintUsageAndExit()
             "  --sequence-number-start <start> value of the first segment sequence number (default: 1)\n"
             "  --force-i-frame-sync <auto|all> treat all I-frames as sync samples (for open-gop sequences)\n"
             "    'auto' only forces the flag if an open-gop source is detected, 'all' forces the flag in all cases\n"
-            "  --copy-udta copy the moov/udta atom from input to output\n"
+            "  --copy-udta copy the /moov/udta and /moov/trak/udta atoms from input to output\n"
+            "  --copy-meta copy the /meta and /moov/meta atom from input to output\n"
             "  --no-zero-elst don't set the last edit list entry to 0 duration\n"
             "  --trun-version-zero set the 'trun' box version to zero (default version: 1)\n"
             );
@@ -311,6 +312,7 @@ Fragment(AP4_File&                input_file,
          AP4_UI32                 timescale,
          bool                     create_segment_index,
          bool                     copy_udta,
+         bool                     copy_meta,
          bool                     trun_version_one)
 {
     AP4_List<FragmentInfo>       fragments;
@@ -481,6 +483,22 @@ Fragment(AP4_File&                input_file,
         AP4_Atom* udta = input_movie->GetMoovAtom()->GetChild(AP4_ATOM_TYPE_UDTA);
         if (udta != NULL) {
             output_movie->GetMoovAtom()->AddChild(udta->Clone());
+        }
+    }
+    
+    // copy the meta atoms
+    if (copy_meta) {
+        // Top-level META
+        AP4_ContainerAtom* input_meta = input_movie->GetMetaAtom();
+        if (input_meta != NULL) {
+            AP4_ContainerAtom* output_meta = output_movie->CreateMetaAtom();
+            input_meta->CopyChildren(*output_meta);
+        }
+        
+        // MOOV/META
+        AP4_Atom* meta = input_movie->GetMoovAtom()->GetChild(AP4_ATOM_TYPE_META);
+        if (meta != NULL) {
+            output_movie->GetMoovAtom()->AddChild(meta->Clone());
         }
     }
     
@@ -822,6 +840,9 @@ Fragment(AP4_File&                input_file,
     
     // write the moov atom
     output_movie->GetMoovAtom()->Write(output_stream);
+    if (output_movie->GetMetaAtom() != NULL) {
+        output_movie->GetMetaAtom()->Write(output_stream);
+    }
 
     // write the (not-yet fully computed) indexes if needed
     AP4_SidxAtom* sidx = NULL;
@@ -1136,6 +1157,7 @@ main(int argc, char** argv)
     bool         create_segment_index          = false;
     bool         quiet                         = false;
     bool         copy_udta                     = false;
+    bool         copy_meta                     = false;
     bool         trun_version_one              = true;
     AP4_UI32     timescale                     = 0;
     AP4_Result   result;
@@ -1222,6 +1244,8 @@ main(int argc, char** argv)
             trun_version_one = false;
         } else if (!strcmp(arg, "--copy-udta")) {
             copy_udta = true;
+        } else if (!strcmp(arg, "--copy-meta")) {
+            copy_meta = true;
         } else if (!strcmp(arg, "--no-zero-elst")) {
             Options.no_zero_elst = true;
         } else {
@@ -1472,7 +1496,7 @@ main(int argc, char** argv)
     } else {
         tracks_to_fragment = cursors;
     }
-    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, trun_version_one);
+    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, copy_meta, trun_version_one);
     
     // cleanup and exit
     if (input_stream)  input_stream->Release();

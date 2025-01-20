@@ -89,6 +89,7 @@ AP4_Movie::AP4_Movie(AP4_UI32 time_scale,
                                   0x00010000,
                                   0x0100);
     m_MoovAtom->AddChild(m_MvhdAtom);
+    m_MetaAtom = NULL;
 }
 
 /*----------------------------------------------------------------------
@@ -110,6 +111,8 @@ AP4_Movie::AP4_Movie(AP4_MoovAtom* moov, AP4_ByteStream& sample_stream, bool tra
         time_scale = 0;
     }
 
+    m_MetaAtom = NULL;
+    
     // get all tracks
     AP4_List<AP4_TrakAtom>* trak_atoms;
     trak_atoms = &moov->GetTrakAtoms();
@@ -130,6 +133,7 @@ AP4_Movie::~AP4_Movie()
 {
     m_Tracks.DeleteReferences();
     if (m_MoovAtomIsOwned) delete m_MoovAtom;
+    if (m_MetaAtom != NULL) delete m_MetaAtom;
 }
 
 /*----------------------------------------------------------------------
@@ -138,8 +142,28 @@ AP4_Movie::~AP4_Movie()
 AP4_Result
 AP4_Movie::Inspect(AP4_AtomInspector& inspector)
 {
+    AP4_Result result;
+    
     // dump the moov atom
-    return m_MoovAtom->Inspect(inspector);
+    result = m_MoovAtom->Inspect(inspector);
+    if AP4_FAILED(result) return result;
+    
+    // dump the meta atom
+    if (m_MetaAtom != NULL) {
+        result = m_MetaAtom->Inspect(inspector);
+    }
+    return result;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_Movie::CreateMetaAtom
++---------------------------------------------------------------------*/
+AP4_ContainerAtom*
+AP4_Movie::CreateMetaAtom()
+{
+    // Create as Full-Sized Atom
+    m_MetaAtom = new AP4_ContainerAtom(AP4_ATOM_TYPE_META, (AP4_UI32)0, (AP4_UI32)0);
+    return m_MetaAtom;
 }
 
 /*----------------------------------------------------------------------
