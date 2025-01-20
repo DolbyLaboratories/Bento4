@@ -108,6 +108,16 @@
 #include "Ap4SidxAtom.h"
 #include "Ap4SbgpAtom.h"
 #include "Ap4SgpdAtom.h"
+#include "Ap4LablAtom.h"
+#include "Ap4PrslAtom.h"
+#include "Ap4ElngAtom.h"
+#include "Ap4KindAtom.h"
+#include "Ap4ArdiAtom.h"
+#include "Ap4ChnlAtom.h"
+#include "Ap4AedbAtom.h"
+#include "Ap4AeppAtom.h"
+#include "Ap4AeprAtom.h"
+#include "Ap4AesdAtom.h"
 
 /*----------------------------------------------------------------------
 |   AP4_AtomFactory::~AP4_AtomFactory
@@ -550,6 +560,56 @@ AP4_AtomFactory::CreateAtomFromStream(AP4_ByteStream& stream,
             }
             break;
 
+          case AP4_ATOM_TYPE_LABL:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_LablAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_PRSL:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_PrslAtom::Create(size_32, stream, *this);
+            break;
+
+          case AP4_ATOM_TYPE_ELNG:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_ElngAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_KIND:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_KindAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_ARDI:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_ArdiAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_CHNL:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_ChnlAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_AEDB:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_AedbAtom::Create(size_32, stream, *this);
+            break;
+
+          case AP4_ATOM_TYPE_AEPP:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_AeppAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_AEPR:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_AeprAtom::Create(size_32, stream);
+            break;
+
+          case AP4_ATOM_TYPE_AESD:
+            if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
+            atom = AP4_AesdAtom::Create(size_32, stream);
+            break;
+
     #if !defined(AP4_CONFIG_MINI_BUILD)
           case AP4_ATOM_TYPE_UUID: {
               AP4_UI08 uuid[16];
@@ -812,6 +872,11 @@ AP4_AtomFactory::CreateAtomFromStream(AP4_ByteStream& stream,
           case AP4_ATOM_TYPE_EDTS: 
           case AP4_ATOM_TYPE_MDRI:
           case AP4_ATOM_TYPE_WAVE:
+          case AP4_ATOM_TYPE_TRGR:
+          case AP4_ATOM_TYPE_TKGD:
+          case AP4_ATOM_TYPE_AELM:
+          case AP4_ATOM_TYPE_AESB:
+          case AP4_ATOM_TYPE_GRPL:
             if (atom_is_large) return AP4_ERROR_INVALID_FORMAT;
             atom = AP4_ContainerAtom::Create(type, size_64, false, force_64, stream, *this);
             break;
