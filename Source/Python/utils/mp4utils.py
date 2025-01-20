@@ -362,6 +362,63 @@ def FindChild(top, path):
         top = children[0]
     return top
 
+# Represents 'labl' atom
+class Label:
+    def __init__(self, atom):
+        self.is_group_label = atom['is_group_label']
+        self.label_id       = atom['label_id']
+        self.language       = atom['language']
+        self.label          = atom['label']
+
+# Represents 'kind' atom
+class Kind:
+    def __init__(self, atom):
+        self.schemeURI  = atom['scheme_uri']
+        self.value      = atom['value']
+
+# Represents 'ardi' atom, including descriptions
+# TODO: could be just a string instead of a class / object
+class AudioRenderingIndication:
+    def __init__(self, atom):
+        self.audio_rendering_indication  = atom['audio_rendering_indication']
+        self.description = []
+        self.description.append('no preference given for the reproduction channel layout') # 0
+        self.description.append('preferred reproduction channel layout is stereo') # 1
+        self.description.append('preferred reproduction channel layout is two-dimensional (e.g. 5.1 multi-channel)') # 2
+        self.description.append('preferred reproduction channel layout is three-dimensional') # 3
+        self.description.append('content is pre-rendered for consumption with headphones') # 4
+
+# Represents 'moov'->'meta'->'grpl'->'prsl' atom and its children
+class Preselection:
+    def __init__(self, atom):
+        self.group_id                       = atom['group_id'] # superfluous?
+        self.num_entities_in_group          = atom['num_entities_in_group'] # superfluous?
+        self.entities_in_group              = [] # Array of entity_id
+        for entity in atom['entities_in_group']:
+            self.entities_in_group.append(entity['entity_id'])
+        if 'preselection_tag' in atom:
+            self.tag        = atom['preselection_tag']
+        if 'selection_priority' in atom:
+            self.selection_priority     = atom['selection_priority']
+        if 'interleaving_tag' in atom:
+            self.interleaving_tag = atom['interleaving_tag']
+        self.labels                         = [] # Array of 'labl' atoms
+        self.audio_rendering_indications    = [] # Array of 0 or 1 'ardi' atoms
+        self.kinds                          = [] # Array of 'kind' atoms
+        self.extended_language              = ''
+        #self.channel_layout                 = [] # Array of 0 or 1 'chnl' atoms
+        # TODO do we need more?
+        for c in atom['children']:
+            if c['name'] == 'labl':
+                self.labels.append(Label(c))
+            elif c['name'] == 'elng':
+                self.extended_language = c['extended_language']
+            elif c['name'] == 'kind':
+                self.kinds.append(Kind(c))
+            elif c['name'] == 'ardi':
+                self.audio_rendering_indications.append(AudioRenderingIndication(c))
+            # TODO handle chnl, etc.
+
 class Mp4Track:
     def __init__(self, parent, info):
         self.parent                   = parent
@@ -541,6 +598,7 @@ class Mp4File:
         self.media_source    = media_source
         self.info            = media_source.mp4_info
         self.tracks          = {}
+        self.preselections   = {}
         self.file_list_index = 0 # used to keep a sequence number just amongst all sources
 
         filename = media_source.filename
@@ -550,7 +608,7 @@ class Mp4File:
         # by default, the media name is the basename of the source file
         self.media_name = path.basename(filename)
 
-        # walk the atom structure
+        # walk the top level atom structure, retrieve type and size only from binary file
         self.atoms = WalkAtoms(filename)
         self.segments = []
         for atom in self.atoms:
@@ -568,7 +626,7 @@ class Mp4File:
         for track in self.info['tracks']:
             self.tracks[track['id']] = Mp4Track(self, track)
 
-        # get a complete file dump
+        # get a complete file dump as JSON
         json_dump = Mp4Dump(options, filename, format='json', verbosity='1')
         self.tree = json.loads(json_dump, strict=False, object_pairs_hook=collections.OrderedDict)
 
@@ -576,7 +634,7 @@ class Mp4File:
         for track in self.tracks.values():
             track.compute_kid()
 
-        # compute default sample durations and timescales
+        # compute default sample durations and timescales, and retrieve preselections
         for atom in self.tree:
             if atom['name'] == 'moov':
                 for c1 in atom['children']:
@@ -594,6 +652,42 @@ class Mp4File:
                                 for c3 in c2['children']:
                                     if c3['name'] == 'mdhd':
                                         self.tracks[track_id].timescale = c3['timescale']
+            if atom['name'] == 'meta':
+                for c1 in atom['children']:
+                    if c1['name'] == 'grpl':
+                        for c2 in c1['children']:
+                            if c2['name'] == 'prsl':
+                                self.preselections[c2['group_id']] = Preselection(c2)
+
+        # debug: show retrieved preselections
+        if options.debug:
+            for preselection in self.preselections:
+                print('Preselection            group_id =', preselection)
+                print('    num_entities_in_group        =', self.preselections[preselection].num_entities_in_group)
+                for entity_id in self.preselections[preselection].entities_in_group:
+                    print('        entity_id                =', entity_id)
+                if 'tag' in self.preselections[preselection]:
+                    print('    tag                          = "' + self.preselections[preselection].tag + '"')
+                if 'selection_priority' in self.preselections[preselection]:
+                    print('    selection_priority           =', self.preselections[preselection].selection_priority)
+                if 'interleaving_tag' in self.preselections[preselection]:
+                    print('    interleaving_tag             = "' + self.preselections[preselection].interleaving_tag + '"')
+                for label in self.preselections[preselection].labels:
+                    print('    Label')
+                    print('        label_id                 =', label.label_id)
+                    print('        is_group_label           =', label.is_group_label)
+                    print('        language                 = "' + label.language + '"')
+                    print('        label                    = "' + label.label + '"')
+                print('    ExtendedLanguage')
+                print('        extended_language        = "' + self.preselections[preselection].extended_language + '"')
+                for kind in self.preselections[preselection].kinds:
+                    print('    Kind')
+                    print('        schemeURI                = "' + kind.schemeURI + '"')
+                    print('        value                    = "' + kind.value + '"')
+                for ardi in self.preselections[preselection].audio_rendering_indications:
+                    print('    AudioRenderingIndication')
+                    print('        schemeURI                =', ardi.audio_rendering_indication)
+                    print('        schemeURI meaning:         "' + ardi.description[ardi.audio_rendering_indication] + '"')
 
         # partition the segments
         segment_index = 0
@@ -1323,6 +1417,10 @@ __all__ = [
     'Mp4Track',
     'Mp4File',
     'MediaSource',
+    'Label',
+    'Kind',
+    'AudioRenderingIndication',
+    'Preselection',
     'ComputeBandwidth',
     'MakeNewDir',
     'MakePsshBox',
