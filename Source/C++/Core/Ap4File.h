@@ -77,6 +77,7 @@ const AP4_UI32 AP4_FILE_BRAND_DB1P = AP4_ATOM_TYPE('d','b','1','p');
 const AP4_UI32 AP4_FILE_BRAND_DB2G = AP4_ATOM_TYPE('d','b','2','g');
 const AP4_UI32 AP4_FILE_BRAND_DB4H = AP4_ATOM_TYPE('d','b','4','h');
 const AP4_UI32 AP4_FILE_BRAND_DB4G = AP4_ATOM_TYPE('d','b','4','g');
+const AP4_UI32 AP4_FILE_BRAND_UNIF = AP4_ATOM_TYPE('u','n','i','f');
 
 /*----------------------------------------------------------------------
 |   AP4_File

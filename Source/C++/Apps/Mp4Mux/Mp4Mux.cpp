@@ -2386,6 +2386,11 @@ main(int argc, char** argv)
     if (dolby_vision_ccid & 0x2) {
         brands.Append(AP4_FILE_BRAND_DB2G);
     }
+    
+    // Declare UNIF brand if preselections are present
+    if (preselection_index > 0) {
+        brands.Append(AP4_FILE_BRAND_UNIF);
+    }
 
     movie->GetMvhdAtom()->SetNextTrackId(movie->GetTracks().ItemCount() + 1);
 
