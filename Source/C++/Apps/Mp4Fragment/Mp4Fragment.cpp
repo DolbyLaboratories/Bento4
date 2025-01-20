@@ -417,6 +417,14 @@ Fragment(AP4_File&                input_file,
           }
         }
         
+        // copy the moov/trak/udta atom to the moov/trak container
+        if (copy_udta) {
+            AP4_Atom* udta = track->GetTrakAtom()->GetChild(AP4_ATOM_TYPE_UDTA);
+            if (udta != NULL) {
+                output_track->UseTrakAtom()->AddChild(udta->Clone());
+            }
+        }
+
         // add the track to the output
         output_movie->AddTrack(output_track);
         

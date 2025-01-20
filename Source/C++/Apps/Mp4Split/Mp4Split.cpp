@@ -344,7 +344,14 @@ main(int argc, char** argv)
         fprintf(stderr, "ERROR: cannot write init segment (%d)\n", result);
         return 1;
     }
-        
+    if (movie->GetMetaAtom() != NULL) {
+        result = movie->GetMetaAtom()->Write(*output);
+        if (AP4_FAILED(result)) {
+            fprintf(stderr, "ERROR: cannot write META of init segment (%d)\n", result);
+            return 1;
+        }
+    }
+
     AP4_Atom* atom = NULL;
     unsigned int track_id = 0;
     AP4_DefaultAtomFactory atom_factory;
