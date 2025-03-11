@@ -494,87 +494,6 @@ ConvertRollEditList(AP4_UI64            duration,
 }
 
 /*----------------------------------------------------------------------
-|   SetPreRollSampleGroupDescription
-+---------------------------------------------------------------------*/
-static AP4_Result
-SetPreRollSampleGroupDescription(AP4_Track* track,
-                                 AP4_UI64 frames_roll,
-                                 AP4_UI32 sample_count,
-                                 AP4_UI32 grouping_type)
-{
-    AP4_ContainerAtom* atom = (AP4_ContainerAtom*)track->UseTrakAtom()->GetChild(AP4_ATOM_TYPE_MDIA, 0);
-    if (!atom) {
-        return AP4_FAILURE;
-    }
-
-    atom = (AP4_ContainerAtom*)atom->GetChild(AP4_ATOM_TYPE_MINF, 0);
-    if (!atom) {
-        return AP4_FAILURE;
-    }
-
-    atom = (AP4_ContainerAtom*)atom->GetChild(AP4_ATOM_TYPE_STBL, 0);
-    if (!atom) {
-        return AP4_FAILURE;
-    }
-
-    if (atom->GetChild(AP4_ATOM_TYPE_SGPD) || atom->GetChild(AP4_ATOM_TYPE_SBGP)) {
-        return AP4_FAILURE;
-    }
-
-    // add sgpd box
-    AP4_Byte buffer[8] = {0};
-    AP4_Size buffer_size = 0;
-
-    if (frames_roll - 1 <= 32767) { // 2 bytes payload for INT16
-        buffer_size = 2;
-
-        AP4_UI16 payload = (AP4_SI16(-frames_roll)) & 0xFFFF;
-        buffer[0] = (payload & 0xFF00) >> 8;
-        buffer[1] = payload & 0xFF;
-    }
-    else if (frames_roll - 1 <= 2147483647) { // 4 bytes payload for INT32
-        buffer_size = 4;
-
-        AP4_UI32 payload = -AP4_UI32(frames_roll);
-        buffer[0] = (payload & 0xFF000000) >> 24;
-        buffer[1] = (payload & 0xFF0000) >> 16;
-        buffer[2] = (payload & 0xFF00) >> 8;
-        buffer[3] = payload & 0xFF;
-    }
-    else if (frames_roll - 1 <= 9223372036854775807LL) { // 8 bytes payload for INT64
-        buffer_size = 8;
-
-        AP4_SI64 payload = -AP4_SI64(frames_roll);
-        buffer[0] = (payload & 0xFF00000000000000) >> 56;
-        buffer[1] = (payload & 0xFF000000000000) >> 48;
-        buffer[2] = (payload & 0xFF0000000000) >> 40;
-        buffer[3] = (payload & 0xFF00000000) >> 32;
-        buffer[4] = (payload & 0xFF000000) >> 24;
-        buffer[5] = (payload & 0xFF0000) >> 16;
-        buffer[6] = (payload & 0xFF00) >> 8;
-        buffer[7] = payload & 0xFF;
-    }
-    else {
-        return AP4_FAILURE;
-    }
-
-    AP4_SgpdAtom* new_sgpd = new AP4_SgpdAtom();
-    new_sgpd->SetGroupType(grouping_type);
-    new_sgpd->SetDefaultLength(buffer_size);
-    new_sgpd->AddEntry((AP4_Byte*)(&buffer), buffer_size);
-
-    // add sbgp box
-    AP4_SbgpAtom* new_sbgp = new AP4_SbgpAtom();
-    new_sbgp->SetGroupType(grouping_type);
-    new_sbgp->AddEntry(sample_count, 1);
-
-    atom->AddChild(new_sgpd);
-    atom->AddChild(new_sbgp);
-
-    return AP4_SUCCESS;
-}
-
-/*----------------------------------------------------------------------
 |   AddAacTrack
 +---------------------------------------------------------------------*/
 static void
@@ -994,12 +913,6 @@ AddEac3Track(AP4_Movie&             movie,
         }
         new_edts->AddChild(new_elst);
         track->SetEditList(new_edts, edts_timescale);
-
-        // add sbgp, sgpd for EAC3 gapless
-        if (offset.pre_roll > 0) {
-            AP4_UI64 frames_roll = AP4_UI64(offset.pre_roll * edts_timescale / 1536);
-            SetPreRollSampleGroupDescription(track, frames_roll, sample_count, 1919904876); // "roll" for all codecs that don’t use the I-frame concept
-        }
     }
 
     // cleanup
@@ -1155,12 +1068,6 @@ AddAc4Track(AP4_Movie&            movie,
         }
         new_edts->AddChild(new_elst);
         track->SetEditList(new_edts, edts_timescale);
-
-        // add sbgp, sgpd for AC4 gapless
-        if (offset.pre_roll > 0) {
-            AP4_UI64 frames_roll = AP4_UI64(offset.pre_roll * edts_timescale / sample_duration);
-            SetPreRollSampleGroupDescription(track, frames_roll, sample_count, 1886547820); // "prol" for AC4
-        }
     }
 
     // cleanup
