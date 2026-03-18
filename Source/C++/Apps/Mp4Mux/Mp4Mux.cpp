@@ -445,7 +445,8 @@ ParseGaplessOffsetParameter(AP4_Array<Parameter>& parameters)
 +---------------------------------------------------------------------*/
 static AP4_Result
 ConvertRollEditList(AP4_UI64            duration,
-                    AP4_UI32            timescale,
+                    AP4_UI32            movie_time_scale,
+                    AP4_UI32            media_time_scale,
                     Gapless_roll&       offset,
                     AP4_ElstAtom*       new_elst)
 {
@@ -456,14 +457,14 @@ ConvertRollEditList(AP4_UI64            duration,
         return AP4_SUCCESS;
     }
 
-    AP4_SI64 pre = AP4_SI64(offset.pre_roll * timescale + 0.5);
-    AP4_SI64 post = AP4_SI64(offset.post_roll * timescale + 0.5);
-    AP4_UI64 media_duration = 0;
-    AP4_UI64 segment_duration = duration;
+    AP4_SI64 pre = AP4_SI64(offset.pre_roll * movie_time_scale + 0.5);
+    AP4_SI64 post = AP4_SI64(offset.post_roll * movie_time_scale + 0.5);
+    AP4_UI64 media_time = 0;
+    AP4_UI64 edit_duration = duration;
 
     // check if the rolling is acceptable??
     if (duration < AP4_UI64(abs(pre) + abs(post))) {
-        fprintf(stderr, "ERROR: The track is too short to handle pre_roll and post_roll, duration (%llu)s\n", duration / timescale);
+        fprintf(stderr, "ERROR: The track is too short to handle pre_roll and post_roll, duration (%llu)s\n", duration / movie_time_scale);
         return AP4_FAILURE;
     }
 
@@ -475,13 +476,13 @@ ConvertRollEditList(AP4_UI64            duration,
 
     // edit list of the track playing
     if (pre > 0) {
-        media_duration = pre;
-        segment_duration -= pre;
+        media_time = AP4_SI64(offset.pre_roll * media_time_scale + 0.5);
+        edit_duration -= pre;
     }
     if (post > 0) {
-        segment_duration -= post;
+        edit_duration -= post;
     }
-    AP4_ElstEntry entry = AP4_ElstEntry(segment_duration, media_duration, 1);
+    AP4_ElstEntry entry = AP4_ElstEntry(edit_duration, media_time, 1);
     new_elst->AddEntry(entry);
 
     // edit list with media_time = -1 at the end of presentation
@@ -900,19 +901,19 @@ AddEac3Track(AP4_Movie&             movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
-        AP4_UI32 edts_timescale = sample_rate;
-        if (!movie.GetTimeScale()) {
+        AP4_UI32 movie_time_scale = movie.GetTimeScale();
+        if(!movie_time_scale) {
             duration = sample_count * 1536;
+            movie_time_scale = track->GetMediaTimeScale();
         } else {
             duration = AP4_ConvertTime(1536*sample_table->GetSampleCount(), sample_rate, movie.GetTimeScale());
-            edts_timescale = movie.GetTimeScale();
         }
-        if (AP4_FAILED(ConvertRollEditList(duration, edts_timescale, offset, new_elst))) {
+        if (AP4_FAILED(ConvertRollEditList(duration, movie_time_scale, track->GetMediaTimeScale(), offset, new_elst))) {
             input->Release();
             return;
         }
         new_edts->AddChild(new_elst);
-        track->SetEditList(new_edts, edts_timescale);
+        track->SetEditList(new_edts, movie_time_scale);
     }
 
     // cleanup
@@ -1055,19 +1056,19 @@ AddAc4Track(AP4_Movie&            movie,
         AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
         AP4_ElstAtom* new_elst = new AP4_ElstAtom();
         AP4_UI64 duration = 0;
-        AP4_UI32 edts_timescale = media_time_scale;
-        if (!movie.GetTimeScale()) {
+        AP4_UI32 movie_time_scale = movie.GetTimeScale();
+        if(!movie_time_scale) {
             duration = AP4_UI64(sample_count) * sample_duration;
+            movie_time_scale = track->GetMediaTimeScale();
         } else {
             duration = AP4_ConvertTime(sample_duration*sample_table->GetSampleCount(), media_time_scale, movie.GetTimeScale());
-            edts_timescale = movie.GetTimeScale();
         }
-        if (AP4_FAILED(ConvertRollEditList(duration, edts_timescale, offset, new_elst))) {
+        if (AP4_FAILED(ConvertRollEditList(duration, movie_time_scale, track->GetMediaTimeScale(), offset, new_elst))) {
             input->Release();
             return;
         }
         new_edts->AddChild(new_elst);
-        track->SetEditList(new_edts, edts_timescale);
+        track->SetEditList(new_edts, movie_time_scale);
     }
 
     // cleanup
