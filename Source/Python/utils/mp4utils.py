@@ -13,6 +13,7 @@ import io
 import struct
 import operator
 import hashlib
+import re
 import fractions
 import xml.sax.saxutils as saxutils
 import base64
@@ -235,6 +236,35 @@ def PrintErrorAndExit(message):
     sys.stderr.write(message+'\n')
     sys.exit(1)
 
+
+# Some Bento4 binaries may interleave non-JSON diagnostics on stdout even
+# when --format json is requested. Strip known noise lines and retry parsing.
+_BENTO4_JSON_NOISE_PATTERNS = [
+    re.compile(r'^\s*found\s+.+\s+atom\s+at\s+position\s+\d+\s*$')
+]
+
+
+def SafeJsonLoads(payload, **kwargs):
+    if isinstance(payload, bytes):
+        payload = payload.decode('utf-8', errors='replace')
+
+    try:
+        return json.loads(payload, **kwargs)
+    except json.JSONDecodeError as original_error:
+        lines = payload.splitlines()
+        filtered_lines = [
+            line for line in lines
+            if not any(pattern.match(line) for pattern in _BENTO4_JSON_NOISE_PATTERNS)
+        ]
+        if len(filtered_lines) == len(lines):
+            raise
+
+        sanitized_payload = '\n'.join(filtered_lines)
+        try:
+            return json.loads(sanitized_payload, **kwargs)
+        except json.JSONDecodeError:
+            raise original_error
+
 def XmlDuration(d):
     h  = int(d) // 3600
     d -= h*3600
@@ -361,6 +391,66 @@ def FindChild(top, path):
         if not children: return None
         top = children[0]
     return top
+
+# Represents 'labl' atom
+class Label:
+    def __init__(self, atom):
+        self.is_group_label = atom['is_group_label']
+        self.label_id       = atom['label_id']
+        self.language       = atom['language']
+        self.label          = atom['label']
+
+# Represents 'kind' atom
+class Kind:
+    def __init__(self, atom):
+        self.schemeURI  = atom['scheme_uri']
+        self.value      = atom['value']
+
+# Represents 'ardi' atom, including descriptions
+# TODO: could be just a string instead of a class / object
+class AudioRenderingIndication:
+    def __init__(self, atom):
+        self.audio_rendering_indication  = atom['audio_rendering_indication']
+        self.description = []
+        self.description.append('no preference given for the reproduction channel layout') # 0
+        self.description.append('preferred reproduction channel layout is stereo') # 1
+        self.description.append('preferred reproduction channel layout is two-dimensional (e.g. 5.1 multi-channel)') # 2
+        self.description.append('preferred reproduction channel layout is three-dimensional') # 3
+        self.description.append('content is pre-rendered for consumption with headphones') # 4
+
+# Represents 'moov'->'meta'->'grpl'->'prsl' atom and its children
+class Preselection:
+    def __init__(self, atom):
+        self.group_id                       = atom['group_id'] # superfluous?
+        self.num_entities_in_group          = atom['num_entities_in_group'] # superfluous?
+        self.entities_in_group              = [] # Array of entity_id
+        for entity in atom['entities_in_group']:
+            self.entities_in_group.append(entity['entity_id'])
+        if 'preselection_tag' in atom:
+            self.tag        = atom['preselection_tag']
+        if 'selection_priority' in atom:
+            self.selection_priority     = atom['selection_priority']
+        if 'interleaving_tag' in atom:
+            self.interleaving_tag = atom['interleaving_tag']
+        self.labels                         = [] # Array of 'labl' atoms
+        self.audio_rendering_indications    = [] # Array of 0 or 1 'ardi' atoms
+        self.kinds                          = [] # Array of 'kind' atoms
+        self.extended_language              = ''
+        #self.channel_layout                 = [] # Array of 0 or 1 'chnl' atoms
+
+        for c in atom['children']:
+            if c['name'] == 'labl':
+                self.labels.append(Label(c))
+            elif c['name'] == 'elng':
+                self.extended_language = c['extended_language']
+            elif c['name'] == 'kind':
+                self.kinds.append(Kind(c))
+            elif c['name'] == 'ardi':
+                self.audio_rendering_indications.append(AudioRenderingIndication(c))
+            elif c['name'] == 'udta':
+                for uc in c['children']:
+                    if uc['name'] == 'diap':
+                        self.dialog_gain = int(uc['dialog_gain'])
 
 class Mp4Track:
     def __init__(self, parent, info):
@@ -558,6 +648,7 @@ class Mp4File:
         self.media_source    = media_source
         self.info            = media_source.mp4_info
         self.tracks          = {}
+        self.preselections   = {}
         self.file_list_index = 0 # used to keep a sequence number just amongst all sources
 
         filename = media_source.filename
@@ -587,11 +678,64 @@ class Mp4File:
 
         # get a complete file dump
         json_dump = Mp4Dump(options, filename, format='json', verbosity='1')
-        self.tree = json.loads(json_dump, strict=False, object_pairs_hook=collections.OrderedDict)
+        self.tree = SafeJsonLoads(json_dump, strict=False, object_pairs_hook=collections.OrderedDict)
 
         # look for KIDs
         for track in self.tracks.values():
             track.compute_kid()
+    
+        # compute default sample durations and timescales, and retrieve preselections
+        for atom in self.tree:
+            if atom['name'] == 'moov':
+                for c1 in atom['children']:
+                    if c1['name'] == 'mvex':
+                        for c2 in c1['children']:
+                            if c2['name'] == 'trex':
+                                self.tracks[c2['track id']].default_sample_duration = c2['default sample duration']
+                    elif c1['name'] == 'trak':
+                        track_id = 0
+                        for c2 in c1['children']:
+                            if c2['name'] == 'tkhd':
+                                track_id = c2['id']
+                        for c2 in c1['children']:
+                            if c2['name'] == 'mdia':
+                                for c3 in c2['children']:
+                                    if c3['name'] == 'mdhd':
+                                        self.tracks[track_id].timescale = c3['timescale']
+            if atom['name'] == 'meta':
+                for c1 in atom['children']:
+                    if c1['name'] == 'grpl':
+                        for c2 in c1['children']:
+                            if c2['name'] == 'prsl':
+                                self.preselections[c2['group_id']] = Preselection(c2)
+
+        # debug: show retrieved preselections
+        if options.debug:
+            for preselection in self.preselections:
+                print('Preselection group_id = ', preselection)
+                print('num_entities_in_group = ', self.preselections[preselection].num_entities_in_group)
+                for entity_id in self.preselections[preselection].entities_in_group:
+                    print('entity_id = ', entity_id)
+
+                for att in ['num_entities_in_group', 'entities_in_group', 'tag', 'selection_priority', 'interleaving_tag', 'extended_language']:
+                    if hasattr(self.preselections[preselection], att):
+                        print(att + ' = ', getattr(self.preselections[preselection], att))
+
+                for label in self.preselections[preselection].labels:
+                    print('Label')
+                    print('label_id = ', label.label_id)
+                    print('is_group_label = ', label.is_group_label)
+                    print('language = "' + label.language + '"')
+                    print('label = "' + label.label + '"')
+                for kind in self.preselections[preselection].kinds:
+                    print('Kind')
+                    print('schemeURI = "' + kind.schemeURI + '"')
+                    print('value = "' + kind.value + '"')
+                for ardi in self.preselections[preselection].audio_rendering_indications:
+                    print('AudioRenderingIndication')
+                    print('schemeURI = ', ardi.audio_rendering_indication)
+                    print('schemeURI meaning: "' + ardi.description[ardi.audio_rendering_indication] + '"')
+                print('--------------------')
 
         # compute default sample durations and timescales
         for atom in self.tree:
@@ -747,7 +891,7 @@ class MediaSource:
         # if the file is an mp4 file, get the mp4 info now
         if self.format == 'mp4':
             json_info = Mp4Info(options, self.filename, format='json', fast=True)
-            self.mp4_info = json.loads(json_info, strict=False)
+            self.mp4_info = SafeJsonLoads(json_info, strict=False)
 
         # keep a record of our original filename in case it gets changed later
         self.original_filename = self.filename
@@ -1340,6 +1484,10 @@ __all__ = [
     'Mp4Track',
     'Mp4File',
     'MediaSource',
+    'Label',
+    'Kind',
+    'AudioRenderingIndication',
+    'Preselection',
     'ComputeBandwidth',
     'MakeNewDir',
     'MakePsshBox',

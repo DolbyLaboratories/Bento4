@@ -36,6 +36,7 @@
 #include <time.h>
 
 #include "Ap4.h"
+#include "Ap4Preselection.h"
 
 /*----------------------------------------------------------------------
 |   constants
@@ -53,6 +54,7 @@ const unsigned int AP4_MUX_READ_BUFFER_SIZE         = 65536;
 static struct {
     bool verbose;
 } Options;
+AP4_Preselection* g_Preselection = NULL;
 
 /*----------------------------------------------------------------------
 |   SampleOrder
@@ -118,7 +120,9 @@ PrintUsageAndExit()
             "If no type is specified for an input, the type will be inferred from the file extension\n"
             "\n"
             "Options:\n"
-            "  --verbose: show more details\n");
+            "  --verbose: show more details\n"
+            "  --preselection: add preselection information combine with configuration file in .ini format\n"
+            "                  please check docs/ for the sample configuration file\n");
     exit(1);
 }
 
@@ -129,19 +133,59 @@ static AP4_Result
 ParseParameters(const char* params_str, AP4_Array<Parameter>& parameters)
 {
     AP4_Array<AP4_String> params;
+    char* p = NULL;
     const char* cursor = params_str;
-    const char* start = params_str;
+    bool b_in_single_quote = false;
+    bool b_in_double_quote = false;
+    bool b_backslash = false;
+
+    // Split by commas, honoring single and double quoted sections
+    // as integral parts (commas contained in quotes are ignored for
+    // splitting), and skipping commas that are preceeded by a backslash
     do {
-        if (*cursor == ',' || *cursor == '\0') {
-            AP4_String param;
-            param.Assign(start, (unsigned int)(cursor-start));
-            params.Append(param);
-            if (*cursor == ',') {
-                start = cursor+1;
+        if (*cursor == '\\' && (! b_backslash)) {
+            b_backslash = true;
+        } else {
+            if ((*cursor == '"') && (! b_in_single_quote) && (! b_backslash)) {
+                b_in_double_quote = ! b_in_double_quote;
+            } else if ((*cursor == '\'') && (! b_in_double_quote) && (! b_backslash)) {
+                b_in_single_quote = ! b_in_single_quote;
+            } else if (
+                        (
+                            (*cursor == ',') &&
+                            (! b_in_single_quote) &&
+                            (! b_in_double_quote) &&
+                            (!b_backslash)
+                        )
+                        ||
+                       (*cursor == '\0')
+                )
+            {
+                // Append completed param string to params array, but discard empty param (,,)
+                if (p != NULL) {
+                    AP4_String param;
+                    param.Assign(p, (AP4_Size)strlen(p));
+                    params.Append(param);
+                    free(p);
+                    p = NULL;
+                }
+            } else {
+                // Append current char to p (skipping ',', '/', '"', and ''' if already handled)
+                size_t len = (p != NULL) ? strlen(p) : 0;
+                char* n = (char *)malloc(len + 2);
+                strncpy(n, p, len);
+                n[len] = *cursor;
+                n[len + 1] = '\0';
+                free(p);
+                p = n;
             }
+            b_backslash = false;
         }
     } while (*cursor++);
-    
+
+    if (p != NULL) free(p);
+    // Split each param by equal into name and value, if applicable
+
     for (unsigned int i=0; i<params.ItemCount(); i++) {
         AP4_String& param = params[i];
         AP4_String name;
@@ -152,6 +196,7 @@ ParseParameters(const char* params_str, AP4_Array<Parameter>& parameters)
             value = param.GetChars()+equal+1;
         } else {
             name = param;
+            value = NULL;
         }
         parameters.Append(Parameter(name.GetChars(), value.GetChars()));
     }
@@ -304,6 +349,68 @@ CheckDoviInputParameters(AP4_Array<Parameter>& parameters)
     if ((profile == 5) && (bc != 0) && (bc != (AP4_UI32)-1)) {
         fprintf(stderr, "ERROR: for dolby vision profile 5, bl signal compatibility id must be 0\n");
         return AP4_ERROR_INVALID_PARAMETERS;
+    }
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   GetLabl (Labl atom from parameter)
++---------------------------------------------------------------------*/
+static AP4_LablAtom*
+GetLabl(AP4_Flags   is_group_label,
+        AP4_UI16    label_id,
+        const char* default_lang,
+        AP4_String param)
+{
+    // Assemble LABL atom
+    AP4_String label = NULL;
+    AP4_String label_lang = default_lang; // E.g., "en-US"
+    int colon = param.Find(':');
+    if (colon >= 0) {
+        label_lang.Assign(param.GetChars(), colon);
+        label = param.GetChars()+colon+1;
+    } else {
+        label = param;
+    }
+    return new AP4_LablAtom(is_group_label, label_id, label_lang.GetChars(), label.GetChars());
+}
+
+
+/*----------------------------------------------------------------------
+|   AddUdtaChild (Add atom inside UDTA atom)
++---------------------------------------------------------------------*/
+static AP4_Result
+AddUdtaChild(AP4_ContainerAtom* parent, AP4_Atom* child)
+{
+    // Find or create UDTA atom in parent
+    AP4_ContainerAtom* udta = NULL;
+    AP4_Atom* atom = parent->FindChild("udta");
+    if (atom == NULL) {
+        udta = new AP4_ContainerAtom(AP4_ATOM_TYPE_UDTA);
+        parent->AddChild(udta);
+    } else {
+        udta = (AP4_ContainerAtom*)atom;
+    }
+    udta->AddChild(child);
+
+    return AP4_SUCCESS;
+}
+
+
+/*----------------------------------------------------------------------
+|   ApplyTrackParams (informative atoms)
++---------------------------------------------------------------------*/
+static AP4_Result
+ApplyTrackParams(AP4_Track* track, AP4_Array<Parameter>& parameters)
+{
+    // Parse track params
+    for (unsigned int i=0; i<parameters.ItemCount(); i++) {
+        if (parameters[i].m_Name == "label") {
+            AP4_String& param = parameters[i].m_Value;
+            AP4_LablAtom* labl = GetLabl(false, 0, "en-US", param);
+            AddUdtaChild(track->UseTrakAtom(), labl);
+        }
     }
 
     return AP4_SUCCESS;
@@ -861,6 +968,8 @@ AddAc4Track(AP4_Movie&            movie,
     AP4_Cardinal sample_count = 0;
     AP4_Cardinal sample_duration = 0;
     AP4_Cardinal media_time_scale = 0;
+    bool b_frame0 = false;
+    AP4_Ac4Frame frame0; // Keep initial 'frame' available for subsequent processing
     bool eos = false;
     for(;;) {
         // try to get a frame
@@ -872,10 +981,11 @@ AddAc4Track(AP4_Movie&            movie,
                        sample_count,
                        frame.m_Info.m_FrameSize,
                        (int)frame.m_Info.m_Ac4Dsi.d.v1.fs,
-                       frame.m_Info.m_ChannelCount);
+                       2);
             }
             if (!initialized) {
                 initialized = true;
+                b_frame0 = true;
 
                 // create a sample description for our samples
                 AP4_Dac4Atom::Ac4Dsi *ac4Dsi = &frame.m_Info.m_Ac4Dsi;
@@ -884,7 +994,7 @@ AddAc4Track(AP4_Movie&            movie,
                     new AP4_Ac4SampleDescription(
                     frame.m_Info.m_Ac4Dsi.d.v1.fs,  // sample rate
                     16,                             // sample size
-                    frame.m_Info.m_ChannelCount,    // channel count
+                    2,    // channel count
                     frame.m_Info.m_FrameSize,       // DIS size, can't calcuate the DSI size in advance, so assume the maximum value is frame size.
                     ac4Dsi);                        // AC-4 DSI
                 sample_description_index = sample_table->GetSampleDescriptionCount();
@@ -893,6 +1003,11 @@ AddAc4Track(AP4_Movie&            movie,
                 sample_duration  = frame.m_Info.m_SampleDuration;
                 media_time_scale = frame.m_Info.m_MediaTimeScale;
 
+                // Clone first frame
+                frame0 = frame;
+                // Allocate array to hold presentations
+                frame0.m_Info.m_Ac4Dsi.d.v1.presentations = new AP4_Dac4Atom::Ac4Dsi::PresentationV1[frame.m_Info.m_Ac4Dsi.d.v1.n_presentations];
+                memcpy(frame0.m_Info.m_Ac4Dsi.d.v1.presentations, ac4Dsi->d.v1.presentations, sizeof(AP4_Dac4Atom::Ac4Dsi::PresentationV1) * frame.m_Info.m_Ac4Dsi.d.v1.n_presentations);
             }
 
             // read and store the sample data
@@ -913,7 +1028,7 @@ AddAc4Track(AP4_Movie&            movie,
                 fprintf(stderr, "WARN: The stream in corrupted, so stop muxing. The muxed MP4 only contains the first %d samples.\n", sample_count);
                 break;
             } else if ((result == AP4_ERROR_NOT_ENOUGH_DATA) && (parser.GetBytesAvailable() == (AP4_BITSTREAM_BUFFER_SIZE -1))){
-                fprintf(stderr, "WARN: The frame %d size is larger than pre-defined buffer size (8191 bytes), so stop muxing. The muxed MP4 only contains the first %d samples.\n", sample_count + 1, sample_count);
+                fprintf(stderr, "WARN: The frame %d size is larger than pre-defined buffer size (%d bytes), so stop muxing. The muxed MP4 only contains the first %d samples.\n", sample_count + 1, AP4_BITSTREAM_BUFFER_SIZE, sample_count);
                 break;
             }
             if (eos) break;
@@ -974,6 +1089,17 @@ AddAc4Track(AP4_Movie&            movie,
     input->Release();
 
     movie.AddTrack(track);
+
+    // Preselections: Adding presentations to Group List of preselections
+    if (g_Preselection) {
+        g_Preselection->generateGrpl(input_name, track->GetId(), &frame0);
+    }
+    ApplyTrackParams(track, parameters);
+
+    // Free clone
+    if (b_frame0) {
+        delete[] frame0.m_Info.m_Ac4Dsi.d.v1.presentations;
+    }
 }
 
 /*----------------------------------------------------------------------
@@ -2219,6 +2345,8 @@ main(int argc, char** argv)
     while (char* arg = *++argv) {
         if (!strcmp(arg, "--verbose")) {
             Options.verbose = true;
+        } else if (!strcmp(arg, "--preselection")) {
+            g_Preselection = new AP4_Preselection(*++argv);
         } else if (!strcmp(arg, "--track")) {
             input_names.Append(*++argv);
         } else if (output_filename == NULL) {
@@ -2387,6 +2515,11 @@ main(int argc, char** argv)
         brands.Append(AP4_FILE_BRAND_DB2G);
     }
 
+    // Declare UNIF brand if preselections are present
+    if (g_Preselection) {
+        brands.Append(AP4_FILE_BRAND_UNIF);
+    }
+
     movie->GetMvhdAtom()->SetNextTrackId(movie->GetTracks().ItemCount() + 1);
 
     // open the output
@@ -2404,6 +2537,20 @@ main(int argc, char** argv)
 
         // set the file type
         file.SetFileType(AP4_FILE_BRAND_MP42, 1, &brands[0], brands.ItemCount());
+
+        // Preselections: Adding Track Group Description, stored in top-level META atom, if any were created
+        if (g_Preselection) {
+            // Create META Atom in File
+            AP4_ContainerAtom* meta = new AP4_ContainerAtom(AP4_ATOM_TYPE_META, (AP4_UI32)0, (AP4_UI32)0);
+            file.AddChild(meta);
+
+            // Create a NULL-Handler Atom
+            AP4_HdlrAtom* hdlr = new AP4_HdlrAtom(AP4_HANDLER_TYPE_NULL, "NULL Handler");
+            meta->AddChild(hdlr);
+
+            // Add already filled GRPL as child to META
+            meta->AddChild(g_Preselection->getGrpl());
+        }
 
         // write the file to the output
         AP4_FileWriter::Write(file, *output);

@@ -311,6 +311,7 @@
 #include "Ap4PsshAtom.h"
 #include "Ap4TfraAtom.h"
 #include "Ap4SbgpAtom.h"
+#include "Ap4SgpdAtom.h"
 #include "Ap4MfroAtom.h"
 #include "Ap4Dac3Atom.h"
 #include "Ap4Dec3Atom.h"
@@ -321,8 +322,12 @@
 #include "Ap4AvcParser.h"
 #include "Ap4Eac3Parser.h"
 #include "Ap4Ac3Parser.h"
-#include "Ap4HevcParser.h"
 #include "Ap4SegmentBuilder.h"
+#include "Ap4LablAtom.h"
+#include "Ap4PrslAtom.h"
+#include "Ap4ElngAtom.h"
+#include "Ap4KindAtom.h"
+#include "Ap4ArdiAtom.h"
 
 /*----------------------------------------------------------------------
 |   global functions

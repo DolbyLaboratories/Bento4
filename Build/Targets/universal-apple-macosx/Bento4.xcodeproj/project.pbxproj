@@ -86,6 +86,20 @@
 		A8DFF209222E4970006CBAE9 /* Ap4Ac4Utils.h in Headers */ = {isa = PBXBuildFile; fileRef = A8DFF207222E4970006CBAE9 /* Ap4Ac4Utils.h */; };
 		A8DFF20C222E49A7006CBAE9 /* Ap4Ac4Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8DFF20A222E49A7006CBAE9 /* Ap4Ac4Parser.cpp */; };
 		A8DFF20D222E49A7006CBAE9 /* Ap4Ac4Parser.h in Headers */ = {isa = PBXBuildFile; fileRef = A8DFF20B222E49A7006CBAE9 /* Ap4Ac4Parser.h */; };
+		E1B000000000000000000009 /* Ap4ArdiAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000009 /* Ap4ArdiAtom.cpp */; };
+		E1B00000000000000000000A /* Ap4ArdiAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F00000000000000000000A /* Ap4ArdiAtom.h */; };
+		E1B00000000000000000000D /* Ap4DiapAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F00000000000000000000D /* Ap4DiapAtom.cpp */; };
+		E1B00000000000000000000E /* Ap4DiapAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F00000000000000000000E /* Ap4DiapAtom.h */; };
+		E1B00000000000000000000F /* Ap4ElngAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F00000000000000000000F /* Ap4ElngAtom.cpp */; };
+		E1B000000000000000000010 /* Ap4ElngAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000010 /* Ap4ElngAtom.h */; };
+		E1B000000000000000000011 /* Ap4KindAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000011 /* Ap4KindAtom.cpp */; };
+		E1B000000000000000000012 /* Ap4KindAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000012 /* Ap4KindAtom.h */; };
+		E1B000000000000000000013 /* Ap4LablAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000013 /* Ap4LablAtom.cpp */; };
+		E1B000000000000000000014 /* Ap4LablAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000014 /* Ap4LablAtom.h */; };
+		E1B000000000000000000015 /* Ap4Preselection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000015 /* Ap4Preselection.cpp */; };
+		E1B000000000000000000016 /* Ap4Preselection.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000016 /* Ap4Preselection.h */; };
+		E1B000000000000000000017 /* Ap4PrslAtom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000017 /* Ap4PrslAtom.cpp */; };
+		E1B000000000000000000018 /* Ap4PrslAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = E1F000000000000000000018 /* Ap4PrslAtom.h */; };
 		AC28E6BA2389DE05005D9BE9 /* Ap4Dac3Atom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AC28E6B82389DE04005D9BE9 /* Ap4Dac3Atom.cpp */; };
 		AC28E6BB2389DE05005D9BE9 /* Ap4Dac3Atom.h in Headers */ = {isa = PBXBuildFile; fileRef = AC28E6B92389DE05005D9BE9 /* Ap4Dac3Atom.h */; };
 		ACB4314823BF9B8F003C0A81 /* Ap4VpccAtom.h in Headers */ = {isa = PBXBuildFile; fileRef = ACB4314623BF9B8F003C0A81 /* Ap4VpccAtom.h */; };
@@ -1048,6 +1062,20 @@
 		A8DFF207222E4970006CBAE9 /* Ap4Ac4Utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4Ac4Utils.h; sourceTree = "<group>"; };
 		A8DFF20A222E49A7006CBAE9 /* Ap4Ac4Parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4Ac4Parser.cpp; sourceTree = "<group>"; };
 		A8DFF20B222E49A7006CBAE9 /* Ap4Ac4Parser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4Ac4Parser.h; sourceTree = "<group>"; };
+		E1F000000000000000000009 /* Ap4ArdiAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4ArdiAtom.cpp; sourceTree = "<group>"; };
+		E1F00000000000000000000A /* Ap4ArdiAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4ArdiAtom.h; sourceTree = "<group>"; };
+		E1F00000000000000000000D /* Ap4DiapAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4DiapAtom.cpp; sourceTree = "<group>"; };
+		E1F00000000000000000000E /* Ap4DiapAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4DiapAtom.h; sourceTree = "<group>"; };
+		E1F00000000000000000000F /* Ap4ElngAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4ElngAtom.cpp; sourceTree = "<group>"; };
+		E1F000000000000000000010 /* Ap4ElngAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4ElngAtom.h; sourceTree = "<group>"; };
+		E1F000000000000000000011 /* Ap4KindAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4KindAtom.cpp; sourceTree = "<group>"; };
+		E1F000000000000000000012 /* Ap4KindAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4KindAtom.h; sourceTree = "<group>"; };
+		E1F000000000000000000013 /* Ap4LablAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4LablAtom.cpp; sourceTree = "<group>"; };
+		E1F000000000000000000014 /* Ap4LablAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4LablAtom.h; sourceTree = "<group>"; };
+		E1F000000000000000000015 /* Ap4Preselection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4Preselection.cpp; sourceTree = "<group>"; };
+		E1F000000000000000000016 /* Ap4Preselection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4Preselection.h; sourceTree = "<group>"; };
+		E1F000000000000000000017 /* Ap4PrslAtom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4PrslAtom.cpp; sourceTree = "<group>"; };
+		E1F000000000000000000018 /* Ap4PrslAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4PrslAtom.h; sourceTree = "<group>"; };
 		AC28E6B82389DE04005D9BE9 /* Ap4Dac3Atom.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Ap4Dac3Atom.cpp; sourceTree = "<group>"; };
 		AC28E6B92389DE05005D9BE9 /* Ap4Dac3Atom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4Dac3Atom.h; sourceTree = "<group>"; };
 		ACB4314623BF9B8F003C0A81 /* Ap4VpccAtom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ap4VpccAtom.h; sourceTree = "<group>"; };
@@ -2072,6 +2100,20 @@
 			children = (
 				A8DFF206222E496F006CBAE9 /* Ap4Ac4Utils.cpp */,
 				A8DFF207222E4970006CBAE9 /* Ap4Ac4Utils.h */,
+				E1F000000000000000000009 /* Ap4ArdiAtom.cpp */,
+				E1F00000000000000000000A /* Ap4ArdiAtom.h */,
+				E1F00000000000000000000D /* Ap4DiapAtom.cpp */,
+				E1F00000000000000000000E /* Ap4DiapAtom.h */,
+				E1F00000000000000000000F /* Ap4ElngAtom.cpp */,
+				E1F000000000000000000010 /* Ap4ElngAtom.h */,
+				E1F000000000000000000011 /* Ap4KindAtom.cpp */,
+				E1F000000000000000000012 /* Ap4KindAtom.h */,
+				E1F000000000000000000013 /* Ap4LablAtom.cpp */,
+				E1F000000000000000000014 /* Ap4LablAtom.h */,
+				E1F000000000000000000015 /* Ap4Preselection.cpp */,
+				E1F000000000000000000016 /* Ap4Preselection.h */,
+				E1F000000000000000000017 /* Ap4PrslAtom.cpp */,
+				E1F000000000000000000018 /* Ap4PrslAtom.h */,
 				CA5A8F8B13541628007C6EFC /* Ap4.cpp */,
 				CA9366100B437D030067D50B /* Ap4.h */,
 				CAF0104515343D5D00CCD976 /* Ap4AinfAtom.cpp */,
@@ -2538,6 +2580,13 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1B00000000000000000000A /* Ap4ArdiAtom.h in Headers */,
+				E1B00000000000000000000E /* Ap4DiapAtom.h in Headers */,
+				E1B000000000000000000010 /* Ap4ElngAtom.h in Headers */,
+				E1B000000000000000000012 /* Ap4KindAtom.h in Headers */,
+				E1B000000000000000000014 /* Ap4LablAtom.h in Headers */,
+				E1B000000000000000000016 /* Ap4Preselection.h in Headers */,
+				E1B000000000000000000018 /* Ap4PrslAtom.h in Headers */,
 				CA9366A00B437D040067D50B /* Ap4.h in Headers */,
 				CA9366A10B437D040067D50B /* Ap4Array.h in Headers */,
 				CA9366A30B437D040067D50B /* Ap4Atom.h in Headers */,
@@ -3789,6 +3838,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1B000000000000000000009 /* Ap4ArdiAtom.cpp in Sources */,
+				E1B00000000000000000000D /* Ap4DiapAtom.cpp in Sources */,
+				E1B00000000000000000000F /* Ap4ElngAtom.cpp in Sources */,
+				E1B000000000000000000011 /* Ap4KindAtom.cpp in Sources */,
+				E1B000000000000000000013 /* Ap4LablAtom.cpp in Sources */,
+				E1B000000000000000000015 /* Ap4Preselection.cpp in Sources */,
+				E1B000000000000000000017 /* Ap4PrslAtom.cpp in Sources */,
 				CA9366A20B437D040067D50B /* Ap4Atom.cpp in Sources */,
 				ACB4314923BF9B8F003C0A81 /* Ap4VpccAtom.cpp in Sources */,
 				CA9366A40B437D040067D50B /* Ap4AtomFactory.cpp in Sources */,

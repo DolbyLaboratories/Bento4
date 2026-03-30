@@ -301,6 +301,36 @@ public:
 };
 
 /*----------------------------------------------------------------------
+|   HasPreselectionBox
++---------------------------------------------------------------------*/
+static bool
+HasPreselectionBox(const char* file)
+{
+    AP4_AtomParent top_level;
+    AP4_Atom* atom;
+    AP4_DefaultAtomFactory atom_factory;
+
+    // create the input stream
+    AP4_Result result;
+    AP4_ByteStream* input = NULL;
+    result = AP4_FileByteStream::Create(file, AP4_FileByteStream::STREAM_MODE_READ, input);
+    if (AP4_FAILED(result)) {
+        fprintf(stderr, "ERROR: cannot open input file (%s)\n", file);
+        return 1;
+    }
+
+    while (atom_factory.CreateAtomFromStream(*input, atom) == AP4_SUCCESS) {
+        top_level.AddChild(atom);
+    }
+
+    atom = top_level.FindChild("meta/grpl/prsl");
+    if (atom) {
+        return true;
+    }
+    return false;
+}
+
+/*----------------------------------------------------------------------
 |   Fragment
 +---------------------------------------------------------------------*/
 static void
@@ -311,6 +341,7 @@ Fragment(AP4_File&                input_file,
          AP4_UI32                 timescale,
          bool                     create_segment_index,
          bool                     copy_udta,
+         bool                     copy_meta,
          bool                     trun_version_one)
 {
     AP4_List<FragmentInfo>       fragments;
@@ -481,6 +512,14 @@ Fragment(AP4_File&                input_file,
         AP4_Atom* udta = input_movie->GetMoovAtom()->GetChild(AP4_ATOM_TYPE_UDTA);
         if (udta != NULL) {
             output_movie->GetMoovAtom()->AddChild(udta->Clone());
+        }
+    }
+
+    // copy the moov/meta atom to the moov container
+    if (copy_meta) {
+        AP4_Atom* meta = input_movie->GetMoovAtom()->GetChild(AP4_ATOM_TYPE_META);
+        if (meta != NULL) {
+            output_movie->GetMoovAtom()->AddChild(meta->Clone());
         }
     }
     
@@ -819,6 +858,14 @@ Fragment(AP4_File&                input_file,
     }
     ftyp->Write(output_stream);
     delete ftyp;
+
+    // write the top-level meta atom
+    if (copy_meta) {
+        AP4_Atom* input_meta = input_file.GetChild(AP4_ATOM_TYPE_META);
+        if (input_meta != NULL) {
+            input_meta->Write(output_stream);
+        }
+    }
     
     // write the moov atom
     output_movie->GetMoovAtom()->Write(output_stream);
@@ -1135,10 +1182,12 @@ main(int argc, char** argv)
     bool         auto_detect_fragment_duration = true;
     bool         create_segment_index          = false;
     bool         quiet                         = false;
-    bool         copy_udta                     = false;
     bool         trun_version_one              = true;
     AP4_UI32     timescale                     = 0;
     AP4_Result   result;
+    bool         copy_udta                     = false;
+    bool         copy_meta                     = false;
+
 
     Options.verbosity             = 1;
     Options.debug                 = false;
@@ -1263,9 +1312,15 @@ main(int argc, char** argv)
         fprintf(stderr, "ERROR: cannot create/open output (%d)\n", result);
         return 1;
     }
+
+    // if the input MP4 has preselection, set copy_meta and copy_udta to true automatically
+    if (HasPreselectionBox(input_filename)) {
+        copy_meta = true;
+        copy_udta = true;
+    }
     
     // parse the input MP4 file (moov only)
-    AP4_File input_file(*input_stream, true);
+    AP4_File input_file(*input_stream, true, copy_meta);
     
     // check the file for basic properties
     if (input_file.GetMovie() == NULL) {
@@ -1472,7 +1527,7 @@ main(int argc, char** argv)
     } else {
         tracks_to_fragment = cursors;
     }
-    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, trun_version_one);
+    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, copy_meta, trun_version_one);
     
     // cleanup and exit
     if (input_stream)  input_stream->Release();

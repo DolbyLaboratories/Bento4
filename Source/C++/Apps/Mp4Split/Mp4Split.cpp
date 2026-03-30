@@ -339,6 +339,16 @@ main(int argc, char** argv)
             }
         }
     }
+
+    AP4_Atom* meta = file->GetChild(AP4_ATOM_TYPE_META);
+    if (meta != NULL) {
+        result = meta->Write(*output);
+        if (AP4_FAILED(result)) {
+            fprintf(stderr, "ERROR: cannot write META of init segment (%d)\n", result);
+            return 1;
+        }
+    }
+
     result = movie->GetMoovAtom()->Write(*output);
     if (AP4_FAILED(result)) {
         fprintf(stderr, "ERROR: cannot write init segment (%d)\n", result);

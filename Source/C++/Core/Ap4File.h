@@ -72,11 +72,15 @@ const AP4_UI32 AP4_FILE_BRAND_ODCF = AP4_ATOM_TYPE('o','d','c','f');
 const AP4_UI32 AP4_FILE_BRAND_OPF2 = AP4_ATOM_TYPE('o','p','f','2');
 const AP4_UI32 AP4_FILE_BRAND_AVC1 = AP4_ATOM_TYPE('a','v','c','1');
 const AP4_UI32 AP4_FILE_BRAND_HVC1 = AP4_ATOM_TYPE('h','v','c','1');
+const AP4_UI32 AP4_FILE_BRAND_DASH = AP4_ATOM_TYPE('d','a','s','h');
 const AP4_UI32 AP4_FILE_BRAND_DBY1 = AP4_ATOM_TYPE('d','b','y','1');
 const AP4_UI32 AP4_FILE_BRAND_DB1P = AP4_ATOM_TYPE('d','b','1','p');
 const AP4_UI32 AP4_FILE_BRAND_DB2G = AP4_ATOM_TYPE('d','b','2','g');
 const AP4_UI32 AP4_FILE_BRAND_DB4H = AP4_ATOM_TYPE('d','b','4','h');
 const AP4_UI32 AP4_FILE_BRAND_DB4G = AP4_ATOM_TYPE('d','b','4','g');
+const AP4_UI32 AP4_FILE_BRAND_UNIF = AP4_ATOM_TYPE('u','n','i','f');
+const AP4_UI32 AP4_FILE_BRAND_CMFC = AP4_ATOM_TYPE('c','m','f','c');
+const AP4_UI32 AP4_FILE_BRAND_CMF2 = AP4_ATOM_TYPE('c','m','f','2');
 
 /*----------------------------------------------------------------------
 |   AP4_File
@@ -102,10 +106,15 @@ public:
      * @param moov_only indicates whether parsing of the atoms should stop
      * when the moov atom is found or if all atoms should be parsed until the
      * end of the file. 
+     * @param meta_only indicates whether parsing of the atoms should stop
+     * when the first meta atom is found or if all atoms should be parsed until the
+     * end of the file. If both moov_only and meta_only are TRUE, stop when both atoms 
+     * are found
      */
     AP4_File(AP4_ByteStream&  stream, 
              AP4_AtomFactory& atom_factory,
-             bool             moov_only);
+             bool             moov_only,
+             bool             meta_only);
 
     /**
      * Constructs an AP4_File from a stream using the default atom factory
@@ -114,7 +123,7 @@ public:
      * when the moov atom is found or if all atoms should be parsed until the
      * end of the file. 
      */
-    AP4_File(AP4_ByteStream& stream, bool moov_only = false);
+    AP4_File(AP4_ByteStream& stream, bool moov_only = false, bool meta_only = false);
 
     /**
      * Destroys the AP4_File instance 
@@ -165,7 +174,8 @@ private:
     // methods
     void ParseStream(AP4_ByteStream&  stream,
                      AP4_AtomFactory& atom_factory,
-                     bool             moov_only);
+                     bool             moov_only,
+                     bool             meta_only);
     
     // members
     AP4_Movie*    m_Movie;

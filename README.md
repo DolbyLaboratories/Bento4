@@ -1,3 +1,50 @@
+Preselection in AC4
+=====
+
+This branch is a reference implementation of AC-4 preselection for ISO and DASH workflows. It is not fully compliant with *Dolby AC-4 Streams Within the ISO Base Media File Format Guidelines for Multiplexers v1.0*. Please do not use it as a reference for HLS packaging or for features beyond preselection.
+
+Because preselection inputs can be complex, muxing is controlled through a configuration file.
+See Documents/preselection_config.ini for an example.
+
+By default, preselection-related features are preserved in both the fragmented MP4 output and the generated manifest.
+
+Example workflow:
+
+```
+mp4mux --track ac4:main_5pres_live.ac4#language=und,label="en:Example Content in Dolby AC-4 with 5 pre-selections" --preselection config.ini test.mp4
+mp4fragment test.mp4 test_f.mp4
+python3 mp4-dash.py test_f.mp4
+```
+
+Configuration fields:
+
+* **presentation_index**: Position of the presentation in the DSI, starting at 0. Default: 0.
+
+* **track**: Track file name.
+
+* **dialog_gain**: Dialog gain in dB. Can be positive or negative.
+
+* **extend_language**: Extended language code(s). Use commas to separate multiple values (for example, en,de). If omitted, the value from the AC-4 DSI is used.
+
+* **selection_priority**: Preselection priority value. Higher values indicate higher preference when a player selects preselections.
+
+* **group_id**: Groups multiple tracks into a single preselection. If set for one preselection, it must be set for all preselections. If omitted, a value is assigned automatically.
+
+* **kind**: DASH role for the preselection (for example, main, dub, and so on). If omitted, the role is derived from the stream.
+
+* **label**: Human-readable description of the preselection or track. You can prefix the label language using a colon (:). Multiple label parameters per track are supported. Language tags must follow IETF BCP 47.
+
+* **kind_urn**: Optional URN prefix for the role, separated by a space. Default: urn:mpeg:dash:role:2011. Multiple pres_kind entries are supported. Using pres_kind without parameters adds the default role derived from the stream. When multiple roles are used, **it is recommended to provide both kind and kind_urn**. For kind boxes that include only scheme_uri (without a value), set kind to NULL:
+
+```
+[Preselection_a]
+presentation_index = 0
+track = main_5pres_live.ac4
+kind = NULL
+kind_urn = example_scheme_uri
+```
+
+
 Bento4
 =====
 ![CI](https://github.com/axiomatic-systems/Bento4/workflows/CI/badge.svg?branch=master)

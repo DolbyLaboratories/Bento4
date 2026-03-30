@@ -72,6 +72,7 @@ class AP4_ByteStream : public AP4_Referenceable
     AP4_Result WriteUI24(AP4_UI32 value);
     AP4_Result WriteUI16(AP4_UI16 value);
     AP4_Result WriteUI08(AP4_UI08 value);
+    AP4_Result WriteNullTerminatedString(const char* string_buffer);
     virtual AP4_Result Seek(AP4_Position position) = 0;
     virtual AP4_Result Tell(AP4_Position& position) = 0;
     virtual AP4_Result GetSize(AP4_LargeSize& size) = 0;
