@@ -638,7 +638,7 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
                         printf("        presentation_id = %d\n", presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1);
                         printf("        Codec String = %s\n", presentation_codec);
                         printf("        presentation_channel_mask_v1 = 0x%x\n", presentation.d.v1.presentation_channel_mask_v1);
-                        printf("        Dolby Atmos source = %s\n", presentation.d.v1.dolby_atmos_indicator? "Yes": "No");
+                        printf("        Dolby Atmos source = %s\n", presentation.d.v1.immersive_audio_indicator? "Yes": "No");
                         printf("        Language = %s\n", presentation_lang);
                         printf("        Self Contained = %s\n", presentation.d.v1.b_multi_pid? "No": "Yes");
                     }
@@ -982,7 +982,7 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
                         }
                         printf("\"presentation_id\": %d, ", presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1);
                         printf("\"presentation_channel_mask_v1\": %u, ",presentation.d.v1.presentation_channel_mask_v1);
-                        printf("\"Dolby Atmos source\": \"%s\", ", presentation.d.v1.dolby_atmos_indicator? "Yes": "No");
+                        printf("\"Dolby Atmos source\": \"%s\", ", presentation.d.v1.immersive_audio_indicator? "Yes": "No");
                         printf("\"Language\": \"%s\", ", presentation_lang);
                         printf("\"Self Contained\": \"%s\"} ", presentation.d.v1.b_multi_pid? "No": "Yes");
                         separator = ",\n";

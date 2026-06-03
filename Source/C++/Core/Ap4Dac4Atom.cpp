@@ -105,7 +105,7 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const Ac4Dsi* ac4Dsi):
         //TODO: if (pres_bytes == 255), shall not happen now. Need the memory move function for bits
         unsigned int pres_bytes_idx = bits.GetBitCount() / 8 - 1;
         if (ac4Dsi->d.v1.n_presentations != 1 && presentation.d.v1.b_presentation_id == 0 && presentation.d.v1.b_extended_presentation_id == 0) {
-            fprintf(stderr, "WARN: Need presentation_id for multiple presnetaion signal. The presentation of Presentation Index (PI) is %d miss presentation_id.\n", idx + 1);
+            fprintf(stderr, "WARN: Need presentation_id for signal with multiple presentations. The presentation of Presentation Index (PI) %d is missing a presentation_id.\n", idx + 1);
         }
         if (presentation.presentation_version == 0){
             // TODO: support presentation version = 0
@@ -124,7 +124,7 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const Ac4Dsi* ac4Dsi):
             }
             legacy_presentation.presentation_version = 1;
             legacy_presentation.d.v1.b_pre_virtualized = 0;
-            legacy_presentation.d.v1.dolby_atmos_indicator = 0;
+            legacy_presentation.d.v1.immersive_audio_indicator = 0;
 
             bits.Write(legacy_presentation.presentation_version, 8);
             bits.Write(default_pres_bytes, 8);    // pres_bytes, need to be updated later
@@ -247,8 +247,11 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const AP4_UI08* payload) :
                             presentation.d.v1.pres_b_4_back_channels_present = bits.ReadBit();
                             presentation.d.v1.pres_top_channel_pairs         = bits.ReadBits(2);
                         }
-                        presentation.d.v1.presentation_channel_mask_v1 = bits.ReadBits(24);
+                        bits.ReadBits(6); // reserved_zero
+                        // presentation_v1_channel_groups
+                        presentation.d.v1.presentation_channel_mask_v1 = bits.ReadBits(18);
                     }else {
+                        // presentation_v1_channel_groups
                         presentation.d.v1.presentation_channel_mask_v1 = 0x800000;
                     }
                     presentation.d.v1.b_presentation_core_differs = bits.ReadBit();
@@ -310,7 +313,8 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const AP4_UI08* payload) :
                                     substream.substream_bitrate_indicator = bits.ReadBits(5);
                                  }
                                  if (substreamgroup.d.v1.b_channel_coded){
-                                    substream.dsi_substream_channel_mask = bits.ReadBits(24);
+                                    bits.ReadBits(6); // reserved_zero
+                                    substream.dsi_substream_channel_mask = bits.ReadBits(18);
                                  } else {
                                     substream.b_ajoc = bits.ReadBit();
                                     if (substream.b_ajoc) {
@@ -377,7 +381,7 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const AP4_UI08* payload) :
                     bits.SkipBits(8 - (bits.GetBitsRead() % 8));
                 }
                 presentation.d.v1.de_indicator = bits.ReadBit();
-                presentation.d.v1.dolby_atmos_indicator = bits.ReadBit();
+                presentation.d.v1.immersive_audio_indicator = bits.ReadBit();
                 bits.SkipBits(4);
                 presentation.d.v1.b_extended_presentation_id = bits.ReadBit();
                 if (presentation.d.v1.b_extended_presentation_id){
@@ -410,15 +414,14 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const AP4_UI08* payload) :
 +---------------------------------------------------------------------*/
 AP4_Dac4Atom::~AP4_Dac4Atom()
 {
-    if (m_Dsi.ac4_dsi_version == 0) {
-        //delete[] m_Dsi.d.v0.presentations;
-    } else if (m_Dsi.ac4_dsi_version == 1) {
+    if (m_Dsi.ac4_dsi_version == 1) {
         for (int i = 0; i < m_Dsi.d.v1.n_presentations; i++) {
-            for (int j = 0; j < m_Dsi.d.v1.presentations[i].d.v1.n_substream_groups; j++) {
-                delete[] m_Dsi.d.v1.presentations[i].d.v1.substream_groups[j].d.v1.substreams;
+            if (m_Dsi.d.v1.presentations[i].d.v1.substream_groups) {
+                for (int j = 0; j < m_Dsi.d.v1.presentations[i].d.v1.n_substream_groups; j++) {
+                    delete[] m_Dsi.d.v1.presentations[i].d.v1.substream_groups[j].d.v1.substreams;
+                }
+                delete[] m_Dsi.d.v1.presentations[i].d.v1.substream_groups;
             }
-            delete[] m_Dsi.d.v1.presentations[i].d.v1.substream_groups;
-            delete[] m_Dsi.d.v1.presentations[i].d.v1.substream_group_indexs;
         }
         delete[] m_Dsi.d.v1.presentations;
     }
@@ -540,6 +543,31 @@ AP4_Dac4Atom::InspectFields(AP4_AtomInspector& inspector)
                 inspector.AddField(field_name, presentation.d.v1.pres_top_channel_pairs);
                 AP4_FormatString(field_name, sizeof(field_name), "[%02d].presentation_channel_mask_v1", i);
                 inspector.AddField(field_name, presentation.d.v1.presentation_channel_mask_v1, AP4_AtomInspector::HINT_HEX);
+                if (presentation.d.v1.presentation_config_v1 == 0x1f) {
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_ajoc", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_ajoc);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_bed_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_bed_objects);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_dynamic_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_dynamic_objects);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_ISF_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_ISF_objects);
+                } else {
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_multi_pid", i);
+                      inspector.AddField(field_name, presentation.d.v1.b_multi_pid);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_ajoc", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_ajoc);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_bed_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_bed_objects);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_dynamic_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_dynamic_objects);
+                      AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_substream_contains_ISF_objects", i);
+                      inspector.AddField(field_name, presentation.d.v1.substream_groups->d.v1.substreams->b_substream_contains_ISF_objects);
+                }
+                AP4_FormatString(field_name, sizeof(field_name), "[%02d].b_pre_virtualized", i);
+                inspector.AddField(field_name, presentation.d.v1.b_pre_virtualized);
+                AP4_FormatString(field_name, sizeof(field_name), "[%02d].immersive_audio_indicator", i);
+                inspector.AddField(field_name, presentation.d.v1.immersive_audio_indicator);
             }
         }
     }
@@ -587,9 +615,9 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoChan(AP4_BitReader &bits,
                                                         unsigned int  &speaker_index_mask,
                                                         unsigned int  frame_rate_factor,
                                                         unsigned int  b_substreams_present,
-                                                        unsigned char &dolby_atmos_indicator)
+                                                        unsigned char &immersive_audio_indicator)
 {
-    ch_mode = ParseChMode(bits, presentation_version, dolby_atmos_indicator); 
+    ch_mode = ParseChMode(bits, presentation_version, immersive_audio_indicator);
     int substreamSpeakerGroupIndexMask = AC4_SPEAKER_GROUP_INDEX_MASK_BY_CH_MODE[ch_mode];
     if ((ch_mode >= CH_MODE_7_0_4) && (ch_mode <= CH_MODE_9_1_4)) {
         if (!(b_4_back_channels_present = bits.ReadBit())) {    // b_4_back_channels_present false
@@ -655,6 +683,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubStreamInfoAjoc(AP4_BitReader &bits,
     } else {
         n_dmx_objects_minus1 = bits.ReadBits(4);
         unsigned int nFullbandDmxSignals = n_dmx_objects_minus1 + 1;
+        // bed_dyn_obj_assignment()
         BedDynObjAssignment(bits, nFullbandDmxSignals, false);
         if (defalut_presentation_flag) {
             channel_count += nFullbandDmxSignals;
@@ -697,6 +726,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                                                        unsigned int  b_substreams_present)
 {
     int nObjectsCode = bits.ReadBits(3);
+    int nSignals = ObjNumFromCode(nObjectsCode);
     if (defalut_presentation_flag) {
         switch (nObjectsCode) {
             case 0:
@@ -713,23 +743,89 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                 //TODO: Error
         }
     }
+    n_objs = 0;
     if (bits.ReadBit()) {                       // b_dynamic_objects
         b_substream_contains_dynamic_objects = 1;
         unsigned int b_lfe = bits.ReadBit();    // b_lfe
         if (defalut_presentation_flag && b_lfe) { channel_count += 1; }
-    }else {
+        b_substream_contains_dynamic_objects |= 1;
+        // Populate obj_type for dynamic objects
+        for (int i = 0; i < nSignals && n_objs < MAX_OBJ_COUNT; i++) {
+            if (b_lfe && i == 0) {
+                obj_type[n_objs]        = OBJ_TYPE_BED;
+                obj_b_lfe[n_objs]       = 1;
+            } else {
+                obj_type[n_objs]        = OBJ_TYPE_DYN;
+                obj_b_lfe[n_objs]       = 0;
+            }
+            obj_b_ajoc_coded[n_objs] = 0;
+            n_objs++;
+        }
+    } else {
         if (bits.ReadBit()) {                   // b_bed_objects
             b_substream_contains_bed_objects = 1;
             if (bits.ReadBit()) {               // b_bed_start
-                if (bits.ReadBit()) {           // b_ch_assign_code
-                    bits.ReadBits(3);           // bed_chan_assign_code
+                b_ch_assign_code = bits.ReadBit();
+                if (b_ch_assign_code) {           
+                    bed_chan_assign_code = bits.ReadBits(3); 
+                    if (nSignals > BedNumFromAssignCode(bed_chan_assign_code)) {
+                        b_substream_contains_dynamic_objects |= 1;
+                    }
+                    // Populate obj_type for bed channel assign code
+                    unsigned int bedNum = BedNumFromAssignCode(bed_chan_assign_code);
+                    for (unsigned int i = 0; i < bedNum && n_objs < MAX_OBJ_COUNT; i++) {
+                        obj_type[n_objs]        = OBJ_TYPE_BED;
+                        obj_b_lfe[n_objs]       = (i == 3) ? 1 : 0;
+                        obj_b_ajoc_coded[n_objs] = 0;
+                        n_objs++;
+                    }
                 }
                 else {
-                    if (bits.ReadBit()) {       // b_nonstd_bed_channel_assignment
-                        bits.ReadBits(17);      // nonstd_bed_channel_assignment_mask
+                    b_nonstd_bed_channel_assignment_flags_present = bits.ReadBit();
+                    if (b_nonstd_bed_channel_assignment_flags_present) { 
+                        nonstd_bed_channel_assignment_flag = bits.ReadBits(17); 
+                        unsigned int bedNum = BedNumFromNonStdMask(nonstd_bed_channel_assignment_flag);
+                        if (bedNum > 0) {
+                            b_substream_contains_bed_objects |= 1;
+                        }
+                        if (nSignals > bedNum) {
+                            b_substream_contains_dynamic_objects |= 1;
+                        }
+                        // Populate obj_type for nonstd bed channel assignment
+                        // bit i of stored int corresponds to spec array index [16-i]
+                        // LFE1 at i==3, LFE2 at i==16
+                        for (int i = 0; i < 17 && n_objs < MAX_OBJ_COUNT; i++) {
+                            if ((nonstd_bed_channel_assignment_flag >> i) & 0x1) {
+                                obj_type[n_objs]        = OBJ_TYPE_BED;
+                                obj_b_lfe[n_objs]       = (i == 3 || i == 16) ? 1 : 0;
+                                obj_b_ajoc_coded[n_objs] = 0;
+                                n_objs++;
+                            }
+                        }
                     }
                     else {
-                        bits.ReadBits(10);      // std_bed_channel_assignment_mask
+                        std_bed_channel_assignment_flag = bits.ReadBits(10);
+                        unsigned int bedNum = BedNumFromStdMask(std_bed_channel_assignment_flag);
+                        if (bedNum > 0) {
+                            b_substream_contains_bed_objects |= 1;
+                        }
+                        if (nSignals > bedNum) {
+                            b_substream_contains_dynamic_objects |= 1;
+                        }
+                        // Populate obj_type for std bed channel assignment
+                        // bit i of stored int corresponds to spec array index [9-i]
+                        // LFE1 at i==2, LFE2 at i==9
+                        static const unsigned int std_bed_ch_count[10] = {2, 1, 1, 2, 2, 2, 2, 2, 2, 1};
+                        for (int i = 0; i < 10 && n_objs < MAX_OBJ_COUNT; i++) {
+                            if ((std_bed_channel_assignment_flag >> i) & 0x1) {
+                                for (unsigned int j = 0; j < std_bed_ch_count[i] && n_objs < MAX_OBJ_COUNT; j++) {
+                                    obj_type[n_objs]        = OBJ_TYPE_BED;
+                                    obj_b_lfe[n_objs]       = (i == 2 || i == 9) ? 1 : 0;
+                                    obj_b_ajoc_coded[n_objs] = 0;
+                                    n_objs++;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -737,7 +833,18 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
             if (bits.ReadBit()) {               // b_isf
                 b_substream_contains_ISF_objects = 1;
                 if (bits.ReadBit()) {           // b_isf_start
-                    bits.ReadBits(3);           // isf_config
+                    unsigned char isf_config = bits.ReadBits(3);           // isf_config
+                    if ((unsigned int)nSignals > ObjNumFromIsfConfig(isf_config)) {
+                        b_substream_contains_dynamic_objects |= 1;
+                    }
+                    // Populate obj_type for ISF objects
+                    unsigned int nIsf = ObjNumFromIsfConfig(isf_config);
+                    for (unsigned int i = 0; i < nIsf && n_objs < MAX_OBJ_COUNT; i++) {
+                        obj_type[n_objs]        = OBJ_TYPE_ISF;
+                        obj_b_lfe[n_objs]       = 0;
+                        obj_b_ajoc_coded[n_objs] = 0;
+                        n_objs++;
+                    }
                 }
             }else {
                 int resBytes = bits.ReadBits(4);
@@ -771,8 +878,9 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::WriteSubstreamDsi(AP4_BitWriter &bits, unsigned
         bits.Write(substream_bitrate_indicator, 5);
     }
     if (b_channel_coded == 1) {
-        bits.Write(dsi_substream_channel_mask, 24);
-    }else {
+        bits.Write(0, 6); // reserved_zero
+        bits.Write(dsi_substream_channel_mask, 18);
+    } else {
         bits.Write(b_ajoc, 1);
         if (b_ajoc == 1) {
             bits.Write(b_static_dmx, 1);
@@ -794,7 +902,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::WriteSubstreamDsi(AP4_BitWriter &bits, unsigned
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode
 +---------------------------------------------------------------------*/
 AP4_Result 
-AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode(AP4_BitReader &bits, int presentationVersion, unsigned char &dolby_atmos_indicator) 
+AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode(AP4_BitReader &bits, int presentationVersion, unsigned char &immersive_audio_indicator)
 {
     int channel_mode_code = 0;
 
@@ -826,7 +934,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode(AP4_BitReader &bits, int presentati
             }
         case 121:                   // 0b1111001
             if (presentationVersion == 2) { // IMS (Atmos content)
-                dolby_atmos_indicator |= 1;
+                immersive_audio_indicator |= 1;
                 return CH_MODE_STEREO;
             }
             else {                  // 7.1: 3/4/0.1
@@ -886,76 +994,141 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseDsiSfMutiplier(AP4_BitReader &bits,
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment
 +---------------------------------------------------------------------*/
 AP4_Result
-AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits, 
+AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                                                      unsigned int  nSignals,
-                                                     bool          is_upmix) 
+                                                     bool          is_upmix)
 {
-    if (!bits.ReadBit()) {      // b_dyn_objects_only
-        if (bits.ReadBit()) {   // b_isf
-            unsigned char isf_config = bits.ReadBits(3); 
+    auto push_obj = [&](AP4_UI08 type, AP4_UI08 lfe, AP4_UI08 ajoc_coded) {
+        if (n_objs >= MAX_OBJ_COUNT) return;
+        obj_type[n_objs]         = type;
+        obj_b_lfe[n_objs]        = lfe;
+        obj_b_ajoc_coded[n_objs] = ajoc_coded;
+        ++n_objs;
+    };
+
+    bool b_dyn_objects_only = bits.ReadBit();
+
+    if (!b_dyn_objects_only) {      // b_dyn_objects_only
+        bool b_isf = bits.ReadBit();
+        if (b_isf) {   // b_isf
+            unsigned char isf_config = bits.ReadBits(3);
+            unsigned int n_isf = ObjNumFromIsfConfig(isf_config);
+
+            for (unsigned int i = 0; i < n_isf; i++) {
+                push_obj(OBJ_TYPE_ISF, 0, 1);
+            }
+
             if (is_upmix) {
                 b_substream_contains_ISF_objects |= 1;
-                if (nSignals > ObjNumFromIsfConfig(isf_config)) {
+                if (nSignals > n_isf) {
                     b_substream_contains_dynamic_objects |= 1;
                 }
             }
-        }else {
-            if (bits.ReadBit()) {           // b_ch_assign_code
-                unsigned char bed_chan_assign_code = bits.ReadBits(3); 
+        } else {
+            b_ch_assign_code = bits.ReadBit();
+            if (b_ch_assign_code) {           // b_ch_assign_code
+                bed_chan_assign_code = bits.ReadBits(3);
+
+                static const unsigned int bed_num_tbl[8] = {2, 3, 5, 7, 9, 7, 9, 11};
+
+                unsigned int bed_num = bed_num_tbl[bed_chan_assign_code & 7];
+                for (unsigned int i = 0; i < bed_num; i++) {
+                    push_obj(OBJ_TYPE_BED, 0, 1);
+                }
+
                 if (is_upmix) {
                     b_substream_contains_bed_objects |= 1;
                     if (nSignals > BedNumFromAssignCode(bed_chan_assign_code)) {
                         b_substream_contains_dynamic_objects |= 1;
                     }
                 }
-            }else {
-                if (bits.ReadBit()) {       // b_chan_assign_mask
-                    if (bits.ReadBit()) {   // b_nonstd_bed_channel_assignment
-                        unsigned int nonstd_bed_channel_assignment_mask = bits.ReadBits(17); 
+            } else {
+                b_channel_assignment_flags_present = bits.ReadBit();
+                if (b_channel_assignment_flags_present) {
+                    b_nonstd_bed_channel_assignment_flags_present = bits.ReadBit();
+                    if (b_nonstd_bed_channel_assignment_flags_present) {
+                        nonstd_bed_channel_assignment_flag = bits.ReadBits(17);
+
+                        for (int i = 0; i < 17; i++) {
+                            if ((nonstd_bed_channel_assignment_flag >> (16 - i)) & 0x1) {
+                                if (i != 3 && i != 16) {
+                                    push_obj(OBJ_TYPE_BED, 0, 1);
+                                }
+                            }
+                        }
+
                         if (is_upmix) {
-                            unsigned int bed_num = BedNumFromNonStdMask(nonstd_bed_channel_assignment_mask);
-                            if (bed_num > 0) { b_substream_contains_bed_objects |= 1; }
+                            unsigned int bed_num = BedNumFromNonStdMask(nonstd_bed_channel_assignment_flag);
+                            if (bed_num > 0) {
+                                b_substream_contains_bed_objects |= 1;
+                            }
+                            if (nSignals > bed_num) {
+                                b_substream_contains_dynamic_objects |= 1;
+                            }
+                        }
+                    } else {
+                        std_bed_channel_assignment_flag = bits.ReadBits(10);
+
+                        static const unsigned int std_bed_ch_count[10] = {2, 1, 1, 2, 2, 2, 2, 2, 2, 1};
+
+                        for (int i = 0; i < 10; i++) {
+                            if ((std_bed_channel_assignment_flag >> (9 - i)) & 0x1) {
+                                if (i != 2 && i != 9) {
+                                    for (unsigned int j = 0; j < std_bed_ch_count[i]; j++) {
+                                        push_obj(OBJ_TYPE_BED, 0, 1);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (is_upmix) {
+                            unsigned int bed_num = BedNumFromStdMask(std_bed_channel_assignment_flag);
+                            if (bed_num > 0) {
+                                b_substream_contains_bed_objects |= 1;
+                            }
                             if (nSignals > bed_num) {
                                 b_substream_contains_dynamic_objects |= 1;
                             }
                         }
                     }
-                    else {
-                        unsigned int std_bed_channel_assignment_mask = bits.ReadBits(10);
-                        if (is_upmix) {
-                            unsigned int bed_num = BedNumFromStdMask(std_bed_channel_assignment_mask);
-                            if (bed_num > 0) { b_substream_contains_bed_objects |= 1; }
-                            if (nSignals > bed_num) {
-                                b_substream_contains_dynamic_objects |= 1;
-                            }
-                        }
-                    }
-                }else {
+                } else {
                     unsigned int nBedSignals = 0;
                     if (nSignals > 1) {
-                        int bedChBits = (int) ceil(log((float)nSignals)/log((float)2));
+                        int bedChBits = (int)ceil(log((float)nSignals) / log((float)2));
                         nBedSignals = bits.ReadBits(bedChBits) + 1;
-                    }
-                    else {
+                    } else {
                         nBedSignals = 1;
                     }
+
+                    nonstd_bed_channel_assignment_flag = 0;
                     for (unsigned int b = 0; b < nBedSignals; b++) {
-                        bits.ReadBits(4);   // nonstd_bed_channel_assignment
+                        b_channel_assignment_flags_present = 1;
+                        nonstd_bed_channel_assignment = bits.ReadBits(4);
+                        nonstd_bed_channel_assignment_flag |= (1 << nonstd_bed_channel_assignment);
+
+                        // spec: if (nonstd_bed_channel_assignment != 3)
+                        if (nonstd_bed_channel_assignment != 3) {
+                            push_obj(OBJ_TYPE_BED, 0, 1);
+                        }
                     }
+
                     if (is_upmix) {
                         b_substream_contains_bed_objects |= 1;
-                        if (nSignals > nBedSignals){ b_substream_contains_dynamic_objects |= 1; }
+                        if (nSignals > nBedSignals) {
+                            b_substream_contains_dynamic_objects |= 1;
+                        }
                     }
                 }
             }
         }
-    }else {
+    } else {
         if (is_upmix) {
             b_substream_contains_dynamic_objects |= 1;
             b_substream_contains_bed_objects     |= 0;
             b_substream_contains_ISF_objects     |= 0;
         }
     }
+
     return AP4_SUCCESS;
 }
 
@@ -965,9 +1138,11 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
 AP4_Result 
 AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamIdxInfo(AP4_BitReader &bits, unsigned int b_substreams_present)
 {
+    ac4_substream_index = -1;
     if (b_substreams_present == 1) {
-        if (bits.ReadBits(2) == 3) {    // substream_index
-            ss_idx = AP4_Ac4VariableBits(bits, 2);
+        ac4_substream_index = bits.ReadBits(2);
+        if (ac4_substream_index == 3) {    // substream_index
+            ac4_substream_index += AP4_Ac4VariableBits(bits, 2);
         }
     }
     return AP4_SUCCESS;
@@ -1003,7 +1178,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseOamdCommonData(AP4_BitReader &bits)
         }
         unsigned int bits_used = Trim(bits);
         bits_used += BedRendeInfo(bits);
-        bits.ReadBits(addDataBytes * 8 - bits_used);
+        bits.SkipBits(addDataBytes * 8 - bits_used);
     }
     return AP4_SUCCESS;
 }
@@ -1011,19 +1186,159 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseOamdCommonData(AP4_BitReader &bits)
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::Trim
 +---------------------------------------------------------------------*/
-AP4_Result
+AP4_Size
 AP4_Dac4Atom::Ac4Dsi::SubStream::Trim(AP4_BitReader &bits)
 {
-    return AP4_SUCCESS;
+    unsigned int begin = bits.GetBitsPosition();
+    if (bits.ReadBit()) {
+        bits.SkipBits(4);
+        unsigned int global_trim_mode = bits.ReadBits(2);
+        if (global_trim_mode == 0b10) {
+            for (unsigned int cfg = 0; cfg < 9; cfg++) {
+                if (bits.ReadBit() == 0) {
+                    if (bits.ReadBit() == 0) {
+                        unsigned int trim_balance_presence_0 = bits.ReadBit();
+                        unsigned int trim_balance_presence_1 = bits.ReadBit();
+                        unsigned int trim_balance_presence_2 = bits.ReadBit();
+                        unsigned int trim_balance_presence_3 = bits.ReadBit();
+                        unsigned int trim_balance_presence_4 = bits.ReadBit();
+                        if (trim_balance_presence_4) {
+                            bits.SkipBits(4); // trim_centre
+                        }
+                        if (trim_balance_presence_3) {
+                            bits.SkipBits(4); // trim_surround
+                        }
+                        if (trim_balance_presence_2) {
+                            bits.SkipBits(4); // trim_height
+                        }
+                        if (trim_balance_presence_1) {
+                            bits.SkipBits(5); // bal3D_Y_sign_tb_code, bal3D_Y_amount_tb
+                        }
+                        if (trim_balance_presence_0) {
+                            bits.SkipBits(5); // bal3D_Y_sign_lis_code, bal3D_Y_amount_lis
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return bits.GetBitsPosition() - begin;
 }
 
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom::Ac4Dsi::SubStream::BedRendeInfo
 +---------------------------------------------------------------------*/
-AP4_Result
+AP4_Size
 AP4_Dac4Atom::Ac4Dsi::SubStream::BedRendeInfo(AP4_BitReader &bits)
 {
-    return AP4_SUCCESS;
+    unsigned int begin = bits.GetBitsPosition();
+    if (bits.ReadBit()) {
+        if (bits.ReadBit()) { // b_stereo_dmx_coeff
+            // stereo_dmx_coeff();
+            bits.SkipBits(3); // loro_centre_mixgain
+            bits.SkipBits(3); // loro_surround_mixgain
+            if (bits.ReadBit()) { // b_ltrt_mixinfo
+                bits.SkipBits(3); // ltrt_centre_mixgain
+                bits.SkipBits(3); // ltrt_surround_mixgain
+            }
+            if (bits.ReadBit()) { // b_lfe_mixinfo
+                bits.SkipBits(5); // lfe_mixgain
+            }
+            bits.SkipBits(2); // preferred_dmx_method
+        }
+        if (bits.ReadBit()) { // b_cdmx_data_present
+            if (bits.ReadBit()) { // b_cdmx_w_to_f
+                bits.SkipBits(3); // gain_w_to_f_code
+            }
+            if (bits.ReadBit()) { // b_cdmx_b4_to_b2
+                bits.SkipBits(3); // gain_b4_to_b2_code
+            }
+            if (bits.ReadBit()) { // b_tm_ch_present
+                if (bits.ReadBit()) { // b_cdmx_t2_to_f_s_b
+                    // tool_t2_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_to_side
+                            bits.SkipBits(3); // gain_t2b_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2c_code
+                        }
+                    }
+                }
+                if (bits.ReadBit()) { // b_cdmx_t2_to_f_s
+                    // tool_t2_to_f_s();
+                    if (bits.ReadBit()) { // b_top_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2b_code
+                    }
+                }
+            }
+            unsigned int b_tb_ch_present = bits.ReadBit();
+            if (b_tb_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tb_to_f_s_b
+                    // tool_tb_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_back_to_front
+                        bits.SkipBits(3); // gain_t2d_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_back_to_side
+                            bits.SkipBits(3); // gain_t2e_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2f_code
+                        }
+                    }
+
+                }
+                if (bits.ReadBit()) { // b_cdmx_tb_to_f_s
+                    // tool_tb_to_f_s();
+                    if (bits.ReadBit()) { // b_top_back_to_front
+                        bits.SkipBits(3); // gain_t2d_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2e_code;
+                    }
+                }
+            }
+            unsigned int b_tf_ch_present = bits.ReadBit();
+            if (b_tf_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tf_to_f_s_b
+                    // tool_tf_to_f_s_b();
+                    if (bits.ReadBit()) { // b_top_front_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        if (bits.ReadBit()) { // b_top_front_to_side
+                            bits.SkipBits(3); // gain_t2b_code
+                        }
+                        else {
+                            bits.SkipBits(3); // gain_t2c_code
+                        }
+                    }
+                }
+                if (bits.ReadBit()) { // b_cdmx_tf_to_f_s
+                    // tool_tf_to_f_s();
+                    if (bits.ReadBit()) { // b_top_front_to_front
+                        bits.SkipBits(3); // gain_t2a_code
+                    }
+                    else {
+                        bits.SkipBits(3); // gain_t2b_code
+                    }
+                }
+            }
+            if (b_tb_ch_present || b_tf_ch_present) {
+                if (bits.ReadBit()) { // b_cdmx_tfb_to_tm
+                    bits.SkipBits(3); // gain_tfb_to_tm_code
+                }
+            }
+        }
+    }
+    return bits.GetBitsPosition() - begin;
 }
 
 /*----------------------------------------------------------------------
@@ -1040,6 +1355,21 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ObjNumFromIsfConfig(unsigned char isf_config)
         case 3: obj_num = 14; break;
         case 4: obj_num = 15; break;
         case 5: obj_num = 30; break;
+        default: obj_num = 0;
+    }
+    return obj_num;
+}
+
+AP4_UI32
+AP4_Dac4Atom::Ac4Dsi::SubStream::ObjNumFromCode(unsigned char obj_code)
+{
+    unsigned int obj_num = 0;
+    switch (obj_code){
+        case 0: obj_num = 1 ; break;
+        case 1: obj_num = 2 ; break;
+        case 2: obj_num = 3 ; break;
+        case 3: obj_num = 4 ; break;
+        case 4: obj_num = 6 ; break;
         default: obj_num = 0;
     }
     return obj_num;
@@ -1153,11 +1483,13 @@ AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1::ParseSubstreamGroupInfo(AP4_BitReader& b
     d.v1.substreams = new AP4_Dac4Atom::Ac4Dsi::SubStream[d.v1.n_substreams];
     AP4_SetMemory(d.v1.substreams, 0, d.v1.n_substreams * sizeof(d.v1.substreams[0]));
     d.v1.b_channel_coded = bits.ReadBit();
+    d.v1.sus_ver = 1;
     if (d.v1.b_channel_coded) {
         for (unsigned int sus = 0; sus < d.v1.n_substreams; sus++) {
             AP4_Dac4Atom::Ac4Dsi::SubStream& substream = d.v1.substreams[sus];
             if (bitstream_version == 1) { 
-                bits.ReadBit(); // sus_ver
+                printf("unsupport bitstream version: 1\n");
+                d.v1.sus_ver = bits.ReadBit(); // sus_ver
             }
 
             // ac4_substream_info_chan()
@@ -1168,7 +1500,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1::ParseSubstreamGroupInfo(AP4_BitReader& b
                                              speaker_index_mask,
                                              frame_rate_factor,
                                              d.v1.b_substreams_present,
-                                             d.v1.dolby_atmos_indicator);
+                                             d.v1.immersive_audio_indicator);
             
             if (d.v1.b_hsf_ext) {
                 // ac4_hsf_ext_substream_info()
@@ -1215,7 +1547,6 @@ AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1::ParseSubstreamGroupInfo(AP4_BitReader& b
             if (channel_count < local_channel_count) { channel_count = local_channel_count;}
         }
     }
-
     d.v1.b_content_type = bits.ReadBit();
     if (d.v1.b_content_type) { 
         // content_type()
@@ -1324,6 +1655,9 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationV1Info(AP4_BitReader &bit
                                                               unsigned int  **first_pres_sg_index,
                                                               unsigned int  &first_pres_sg_num)
 {
+    d.v1.ac4_presentation_substream_index = -1;
+    d.v1.ac4_emdf_substream_index = -1;
+
     unsigned int *substreamGroupIndexes = new unsigned int[AP4_AC4_SUBSTREAM_GROUP_NUM];
     unsigned int b_single_substream_group = bits.ReadBit();
     if (b_single_substream_group != 1){
@@ -1356,7 +1690,7 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationV1Info(AP4_BitReader &bit
         ParseDSIFrameRateFractionsInfo(bits, frame_rate_idx);
 
         // emdf_info()
-        ParseEmdInfo(bits, tmp_emdf_info);
+        ParseEmdInfo(bits, tmp_emdf_info, &d.v1.ac4_emdf_substream_index);
         d.v1.presentation_emdf_version = tmp_emdf_info.emdf_version;
         d.v1.presentation_key_id = tmp_emdf_info.key_id;
            
@@ -1435,7 +1769,7 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationV1Info(AP4_BitReader &bit
         d.v1.b_pre_virtualized     = bits.ReadBit();
         d.v1.b_add_emdf_substreams = bits.ReadBit();
         // ac4_presentation_substream_info()
-        ParsePresentationSubstreamInfo(bits);
+        ParsePresentationSubstreamInfo(bits, &d.v1.ac4_presentation_substream_index);
     }
 
     if (d.v1.b_add_emdf_substreams){
@@ -1444,7 +1778,7 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationV1Info(AP4_BitReader &bit
             d.v1.n_add_emdf_substreams = AP4_Ac4VariableBits(bits, 2) + 4;
         }
         for (unsigned int cnt = 0; cnt < d.v1.n_add_emdf_substreams; cnt ++){
-            ParseEmdInfo(bits, tmp_emdf_info);
+            ParseEmdInfo(bits, tmp_emdf_info, &d.v1.ac4_emdf_substream_index);
             d.v1.substream_emdf_version[cnt] = tmp_emdf_info.emdf_version;
             d.v1.substream_key_id[cnt]       = tmp_emdf_info.key_id;
         }
@@ -1485,13 +1819,13 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::WritePresentationV1Dsi(AP4_BitWriter &bits
                 GetPresTopChannelPairs();
                 bits.Write(d.v1.pres_b_4_back_channels_present, 1);
                 bits.Write(d.v1.pres_top_channel_pairs, 2);
-                if (d.v1.pres_top_channel_pairs) {
-                    d.v1.dolby_atmos_indicator = 1;
-                }
             }
+            //presentation_v1_channel_groups
             d.v1.presentation_channel_mask_v1 = GetPresentationChannelMask();
-            bits.Write(d.v1.presentation_channel_mask_v1, 24);
+            bits.Write(0, 6); // reserved_zero
+            bits.Write(d.v1.presentation_channel_mask_v1, 18);
         }
+
         int pres_ch_mode_core = GetBPresentationCoreDiffers();
         bits.Write(d.v1.b_presentation_core_differs = ((pres_ch_mode_core == -1) ? 0: 1), 1);
         if (d.v1.b_presentation_core_differs == 1) {
@@ -1563,14 +1897,19 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::WritePresentationV1Dsi(AP4_BitWriter &bits
     }
     AP4_ByteAlign(bits);
 
-    /*
-     * TODO: Not implement, need the information from ac4_substream.
-     * Currently just set the value to 1 according to Dolby's internal discussion.
-     */
-    d.v1.de_indicator = 1;
+    d.v1.de_indicator |= d.v1.b_dei_prevent_de_processing;
+    d.v1.de_indicator |= d.v1.b_de_data_present;
+    d.v1.de_indicator |= d.v1.b_dialog_max_gain;
     bits.Write(d.v1.de_indicator, 1);
 
-    bits.Write(d.v1.dolby_atmos_indicator, 1);
+    if (d.v1.immersive_audio_indicator_in_es == immersive_audio_indicator_NONE) {
+        printf("Warning: Calculate immersive_audio_indicator according to deprecated method since it is not present in ES\n");
+        CalculateAtmosIndicator();
+        bits.Write(d.v1.immersive_audio_indicator, 1);
+    } else {
+        bits.Write(d.v1.immersive_audio_indicator_in_es, 1);
+    }
+    
     bits.Write(0, 4);       //reserved bits
 
     if (d.v1.presentation_id > 31) {
@@ -1704,7 +2043,7 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseDSIFrameRateFractionsInfo(AP4_BitRead
 |   AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseEmdInfo
 +---------------------------------------------------------------------*/
 AP4_Result
-AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseEmdInfo(AP4_BitReader &bits, AP4_Ac4EmdfInfo &emdf_info)
+AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseEmdInfo(AP4_BitReader &bits, AP4_Ac4EmdfInfo &emdf_info, AP4_SI32* emdf_payloads_substream_index)
 {
     emdf_info.emdf_version = bits.ReadBits(2);
     if (emdf_info.emdf_version == 3) { 
@@ -1717,8 +2056,9 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseEmdInfo(AP4_BitReader &bits, AP4_Ac4E
     emdf_info.b_emdf_payloads_substream_info = bits.ReadBit();
     if (emdf_info.b_emdf_payloads_substream_info == 1) {
         // emdf_payloads_substream_info ()
-        if (bits.ReadBits(2) == 3) {    // substream_index
-            AP4_Ac4VariableBits(bits, 2);
+        *emdf_payloads_substream_index = bits.ReadBits(2);
+        if (*emdf_payloads_substream_index == 3) {    // substream_index
+            *emdf_payloads_substream_index += AP4_Ac4VariableBits(bits, 2);
         }
     }
     emdf_info.protectionLengthPrimary   = bits.ReadBits(2);
@@ -1762,14 +2102,15 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseEmdInfo(AP4_BitReader &bits, AP4_Ac4E
 |   AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationSubstreamInfo
 +---------------------------------------------------------------------*/
 AP4_Result
-AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationSubstreamInfo(AP4_BitReader &bits)
+AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParsePresentationSubstreamInfo(AP4_BitReader &bits, AP4_SI32 *substream_id)
 {
     d.v1.b_alternative = bits.ReadBit();
     /* unsigned int b_pres_ndot = */ bits.ReadBit();          // b_pres_ndot;
     unsigned int substream_index = bits.ReadBits(2);    //substream_index
     if (substream_index == 3){
-        AP4_Ac4VariableBits(bits, 2);
+        substream_index += AP4_Ac4VariableBits(bits, 2);
     }
+    *substream_id = (AP4_SI32)substream_index;
     return AP4_SUCCESS;
 }
 
@@ -1789,15 +2130,324 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChMode()
             AP4_Dac4Atom::Ac4Dsi::SubStream &substream = substream_group.d.v1.substreams[sus];
             if (substream_group.d.v1.b_channel_coded){
                 pres_ch_mode = AP4_Ac4SuperSet(pres_ch_mode, substream.ch_mode);
-            }else {
+            } else {
                 b_obj_or_ajoc = 1;
             }
         }
     }
-    if (b_obj_or_ajoc == 1) { pres_ch_mode = -1; }
+    bool b_has_dyn = 0;
+    bool b_has_isf = 0;
+    unsigned int merged_mask = 0;
+    if (b_obj_or_ajoc == 1) { 
+        // derive an appropriate channel configuration from the first substream group (Dolby AC-4 Streams Within the ISO Base Media File Format)
+        AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1 &substream_group = d.v1.substream_groups[0];
+        for (unsigned int sus = 0; sus < substream_group.d.v1.n_substreams; sus++){
+            AP4_Dac4Atom::Ac4Dsi::SubStream &substream = substream_group.d.v1.substreams[sus];
+            if (substream.b_substream_contains_dynamic_objects == 1) {
+                b_has_dyn = 1;
+            }
+            if (substream.b_substream_contains_ISF_objects == 1) {
+                b_has_isf = 1;
+            }
+            AP4_UI32 substream_channel_mask = substream.GetObjChannelMask();
+            merged_mask |= substream_channel_mask;
+        }
+        if (!b_has_dyn && !b_has_isf){
+            pres_ch_mode = ConvertCSpeakerLayoutToChannelMode(merged_mask);
+        } else {
+            pres_ch_mode = -1;
+        }
+    }
     return pres_ch_mode;
 }
 
+int AP4_Dac4Atom::Ac4Dsi::PresentationV1::ConvertCSpeakerLayoutToChannelMode(AP4_UI32 channel_mask)
+{
+    // Table 88
+    int ch_mode = 0;
+    // bit 0-16:  L R C LFE Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw LFE2
+    switch (channel_mask) {
+        // Mono
+        case 0x00001:  // bit 0: L
+            ch_mode = 0;
+            break;
+        // Stereo
+        case 0x00003:  // bit 0,1: L,R
+            ch_mode = 1;
+            break;
+        // 3.0
+        case 0x00007:  // bit 0,1,2: L,R,C
+            ch_mode = 2;
+            break;
+        // 5.0
+        case 0x00037:  // bit 0,1,2,4,5: L,R,C,Ls,Rs
+            ch_mode = 3;
+            break;
+        // 5.1
+        case 0x0003F:  // bit 0,1,2,3,4,5: L,R,C,LFE,Ls,Rs
+            ch_mode = 4;
+            break;
+        // 7.0: 3/4/0 (L, C, R, Ls, Rs, Lb, Rb)
+        case 0x000F7:  // bit 0,1,2,4,5,6,7
+            ch_mode = 5;
+            break;
+        // 7.1: 3/4/0.1 (L, C, R, Ls, Rs, Lb, Rb, LFE) 
+        case 0x000FF:  // bit 0,1,2,3,4,5,6,7
+            ch_mode = 6;
+            break;
+        // 7.0: 5/2/0 (L, C, R, Lw, Rw, Ls, Rs
+        case 0xC037:  // bit 0,1,2,4,5,14,15
+            ch_mode = 7;
+            break;
+        // 7.1: 5/2/0.1 (L, C, R, Lw, Rw, Ls, Rs, LFE)
+        case 0xC03F:  // bit 0,1,2,3,4,5,14,15
+            ch_mode = 8;
+            break;
+        // 7.0: 3/2/2 (L, C, R, Ls, Rs, Tfl, Tfr) 
+        case 0x00337:  // bit 0,1,2,4,5,8,9
+            ch_mode = 9;
+            break;
+        // 7.1: 3/2/2.1 (L, C, R, Ls, Rs, Tfl, Tfr, LFE) 
+        case 0x0033F:  // bit 0,1,2,3,4,5,8,9
+            ch_mode = 10;
+            break;
+        default:
+            ch_mode = -1;
+            break;
+    }
+    return ch_mode;
+}
+
+static inline void AP4_Ac4SetIfChannel(AP4_UI32 nonstd_mask, int array_pos, int speaker_index, AP4_UI32& channel_mask)
+{
+    if (nonstd_mask & (1u << array_pos)) {
+        channel_mask |= (1u << speaker_index);
+    }
+}
+
+static inline void AP4_Ac4SetBitChannel(AP4_UI32& mask, int speaker_index)
+{
+    mask |= (1u << speaker_index);
+}
+
+AP4_UI32
+AP4_Dac4Atom::Ac4Dsi::SubStream::GetObjChannelMask()
+{
+    AP4_UI32 channel_mask = 0; // bit 0-16:  L R C LFE Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw LFE2
+    // Convert bed_chan_assign_code to channel mask (AC-4 Table 62)
+    if (b_ch_assign_code) {
+        switch (bed_chan_assign_code) {
+            case 0: // 2.0 (L, R)
+            {
+                AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                break;
+            }
+            case 1: // 3.0 (L, C, R)
+            {
+                AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                break;
+            }
+            case 2: // 5.0.0 (L, R, C, Ls, Rs) || 5.1.0 (L, R, C, LFE, Ls, Rs)
+            {
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                }
+                break;
+            }
+            case 3: // 5.0.2 (L, R, C, Ls, Rs, Tsl, Tsr) || 5.1.2 (L, R, C, LFE, Ls, Rs, Tsl, Tsr)  
+            {
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
+                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
+                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                }
+                break;
+            }
+            case 4: 
+            {
+                // 5.0.4 (L, R, C, Ls, Rs, Tfl, Tfr, Tbl, Tbr ) || 5.1.4 (L, R, C, LFE, Ls, Rs, Tfl, Tfr, Tbl, Tbr )
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
+                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
+                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
+                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
+                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
+                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
+                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                }
+                break;
+            }
+            case 5: 
+            {
+                // 7.0.0 (L,C,R,Ls,Rs,Lb,Rb) || 7.1.0 (L,C,R,LFE,Ls,Rs,Lb,Rb)
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                }
+                break;
+            }
+            case 6: 
+            {
+                // 7.0.2 (L,C,R,Ls,Rs,Lb,Rb,Tsl,Tsr) || 7.1.2 (L,C,R,LFE,Ls,Rs,Lb,Rb,Tsl,Tsr)
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
+                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
+                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                }
+                break;
+            }
+            case 7: 
+            {
+                // 7.0.4 (L,C,R,Ls,Rs,Lb,Rb,Tfl,Tfr,Tbl,Tbr) || 7.1.4 (L,C,R,LFE,Ls,Rs,Lb,Rb,Tfl,Tfr,Tbl,Tbr)
+                if (b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
+                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
+                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
+                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                } else {
+                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
+                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
+                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
+                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
+                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
+                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
+                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
+                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                }
+                break;
+            }
+            default:
+                channel_mask = 0;
+                break;
+        }
+    }
+    
+    // Convert bed_channel_assignment_flag to channel mask (AC-4 Table 64)
+    if (b_nonstd_bed_channel_assignment_flags_present) {
+        uint32_t nonstd_mask = nonstd_bed_channel_assignment_flag;
+        AP4_Ac4SetIfChannel(nonstd_mask, 16, 0, channel_mask);   // L
+        AP4_Ac4SetIfChannel(nonstd_mask, 15, 1, channel_mask);   // R
+        AP4_Ac4SetIfChannel(nonstd_mask, 14, 2, channel_mask);   // C
+        AP4_Ac4SetIfChannel(nonstd_mask, 13, 3, channel_mask);   // LFE
+        AP4_Ac4SetIfChannel(nonstd_mask, 12, 4, channel_mask);   // Ls
+        AP4_Ac4SetIfChannel(nonstd_mask, 11, 5, channel_mask);   // Rs
+        AP4_Ac4SetIfChannel(nonstd_mask, 10, 6, channel_mask);   // Lb
+        AP4_Ac4SetIfChannel(nonstd_mask,  9, 7, channel_mask);   // Rb
+        AP4_Ac4SetIfChannel(nonstd_mask,  8, 8, channel_mask);   // Tfl
+        AP4_Ac4SetIfChannel(nonstd_mask,  7, 9, channel_mask);   // Tfr
+        AP4_Ac4SetIfChannel(nonstd_mask,  6, 10, channel_mask);  // Tsl
+        AP4_Ac4SetIfChannel(nonstd_mask,  5, 11, channel_mask);  // Tsr
+        AP4_Ac4SetIfChannel(nonstd_mask,  4, 12, channel_mask);  // Tbl
+        AP4_Ac4SetIfChannel(nonstd_mask,  3, 13, channel_mask);  // Tbr
+        AP4_Ac4SetIfChannel(nonstd_mask,  2, 14, channel_mask);  // Lw
+        AP4_Ac4SetIfChannel(nonstd_mask,  1, 15, channel_mask);  // Rw
+        AP4_Ac4SetIfChannel(nonstd_mask,  0, 16, channel_mask);  // LFE2
+    }
+    // Convert std_bed_channel_assignment_flag to channel mask (AC-4 Table 65)
+    if (b_channel_assignment_flags_present) {
+        AP4_UI32 std_mask = std_bed_channel_assignment_flag;
+        AP4_Ac4SetIfChannel(std_mask, 9, 0, channel_mask);   // L
+        AP4_Ac4SetIfChannel(std_mask, 9, 1, channel_mask);   // R
+        AP4_Ac4SetIfChannel(std_mask, 8, 2, channel_mask);   // C
+        AP4_Ac4SetIfChannel(std_mask, 7, 3, channel_mask);   // LFE
+        AP4_Ac4SetIfChannel(std_mask, 6, 4, channel_mask);   // Ls
+        AP4_Ac4SetIfChannel(std_mask, 6, 5, channel_mask);   // Rs
+        AP4_Ac4SetIfChannel(std_mask, 5, 6, channel_mask);   // Lb
+        AP4_Ac4SetIfChannel(std_mask, 5, 7, channel_mask);   // Rb
+        AP4_Ac4SetIfChannel(std_mask, 4, 8, channel_mask);   // Tfl
+        AP4_Ac4SetIfChannel(std_mask, 4, 9, channel_mask);   // Tfr
+        AP4_Ac4SetIfChannel(std_mask, 3, 10, channel_mask);  // Tsl
+        AP4_Ac4SetIfChannel(std_mask, 3, 11, channel_mask);  // Tsr
+        AP4_Ac4SetIfChannel(std_mask, 2, 12, channel_mask);  // Tbl
+        AP4_Ac4SetIfChannel(std_mask, 2, 13, channel_mask);  // Tbr
+        AP4_Ac4SetIfChannel(std_mask, 1, 14, channel_mask);  // Lw
+        AP4_Ac4SetIfChannel(std_mask, 1, 15, channel_mask);  // Rw
+        AP4_Ac4SetIfChannel(std_mask, 0, 16, channel_mask);  // LFE2
+    }
+    return channel_mask;
+}
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChannelMask
 +---------------------------------------------------------------------*/
@@ -1832,8 +2482,34 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChannelMask()
     if ((channel_mask & 0x30) && (channel_mask & 0x80))  { channel_mask &= ~0x80;}
 
     // objective channel mask
-    if (b_obj_or_ajoc == 1) { channel_mask = 0x800000; }
+    // if (b_obj_or_ajoc == 1) { channel_mask = 0x800000; }
+    if (b_obj_or_ajoc == 1) { 
+        channel_mask = GetChannelMaskFromChMode(d.v1.dsi_presentation_ch_mode);
+    }
     return channel_mask;
+}
+
+AP4_Result AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetChannelMaskFromChMode(unsigned int ch_mode) {
+    int substreamSpeakerGroupIndexMask = AC4_SPEAKER_GROUP_INDEX_MASK_BY_CH_MODE[ch_mode];
+    if ((ch_mode >= CH_MODE_7_0_4) && (ch_mode <= CH_MODE_9_1_4)) {
+        if (!d.v1.pres_b_4_back_channels_present) {    // b_4_back_channels_present false
+            substreamSpeakerGroupIndexMask &= ~0x8;             // Remove back channels (Lb,Rb) from mask
+        }
+        if (!d.v1.pres_b_centre_present) {             // b_centre_present false
+            substreamSpeakerGroupIndexMask &= ~0x2;             // Remove centre channel (C) from mask
+        }
+        switch (d.v1.pres_top_channel_pairs) {      // top_channels_present
+            case 0:
+                substreamSpeakerGroupIndexMask &= ~0x30;        // Remove top channels (Tfl,Tfr,Tbl,Tbr) from mask
+                break;
+            case 1:
+            case 2:
+                substreamSpeakerGroupIndexMask &= ~0x30;        // Remove top channels (Tfl,Tfr,Tbl,Tbr) from mask
+                substreamSpeakerGroupIndexMask |=  0x80;        // Add top channels (Tl, Tr) from mask;
+                break;
+        }
+    }
+    return substreamSpeakerGroupIndexMask;
 }
 
 /*----------------------------------------------------------------------
@@ -1846,6 +2522,7 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresB4BackChannelsPresent()
         AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1 &substream_group = d.v1.substream_groups[sg];
         for (unsigned int sus = 0; sus < substream_group.d.v1.n_substreams; sus ++){
             d.v1.pres_b_4_back_channels_present |=  substream_group.d.v1.substreams[sus].b_4_back_channels_present;
+            d.v1.pres_b_centre_present |= substream_group.d.v1.substreams[sus].b_centre_present;
         }
     }
     return AP4_SUCCESS;
@@ -1916,4 +2593,28 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetBPresentationCoreDiffers()
         pres_ch_mode_core = -1;
     }
     return pres_ch_mode_core;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_Dac4Atom::Ac4Dsi::PresentationV1::CalculateAtmosIndicator
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_Dac4Atom::Ac4Dsi::PresentationV1::CalculateAtmosIndicator()
+{
+    // channel based immersive
+    if (d.v1.pres_top_channel_pairs) {
+        d.v1.immersive_audio_indicator = 1;
+    }
+    // AJOC based Atmos
+    for (unsigned int sg = 0; sg < d.v1.n_substream_groups; sg++) {
+        AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1 &substream_group = d.v1.substream_groups[sg];
+        unsigned int n_substreams = d.v1.substream_groups[sg].d.v1.n_substreams;
+        for (unsigned int sus = 0; sus < n_substreams; sus++) {
+            AP4_Dac4Atom::Ac4Dsi::SubStream &substream = substream_group.d.v1.substreams[sus];
+            if (substream.b_ajoc) {
+                d.v1.immersive_audio_indicator = 1;
+            }
+        }
+    }
+    return AP4_SUCCESS;
 }

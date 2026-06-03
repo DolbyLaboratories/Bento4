@@ -369,6 +369,16 @@ AP4_Preselection::getSection(const char *input_name, AP4_UI32 presentation_index
     return NULL;
 }
 
+AP4_SI16 computeDialogGainFromCode(AP4_UI32 code) {
+    if (code == 0)  return -128;      // -inf dB
+    if (code == 1)  return -24;       // -12 dB
+    if (code >= 2 && code <= 13) return code - 14; // 2..13 => -12..-1.5 dB
+    if (code >= 14 && code <= 61) return code - 13; // 14..61 => -1..+24.5 dB
+    if (code == 62) return 60;        // +60 dB
+    if (code == 63) return 127;       // +inf dB
+    return 0; // should not happen
+}
+
 /*----------------------------------------------------------------------
 |   AP4_Preselection::applyConfig
 +---------------------------------------------------------------------*/
@@ -383,13 +393,22 @@ AP4_Preselection::applyConfig(AP4_PrslAtom *prsl, AP4_Dac4Atom::Ac4Dsi::Presenta
     {
         prsl->SetSelectionPriority(section->selection_priority);
     }
-    if (section->dialog_gain_exist)
-    {
-        AP4_ContainerAtom *udta = new AP4_ContainerAtom(AP4_ATOM_TYPE_UDTA);
-        AP4_DiapAtom *diap = new AP4_DiapAtom(section->dialog_gain);
-        udta->AddChild(diap);
-        prsl->AddChild(udta);
+    AP4_ContainerAtom *udta = new AP4_ContainerAtom(AP4_ATOM_TYPE_UDTA);
+    AP4_SI16 gain_from_es = 0;
+    if (pres->d.v1.b_dei_dialog_gain_code_present) {
+        gain_from_es = computeDialogGainFromCode(pres->d.v1.dei_dialog_gain_code);
     }
+    if (!section->dialog_gain_exist) {
+        section->dialog_gain = gain_from_es;
+    } else {
+        if (section->dialog_gain != gain_from_es) {
+            fprintf(stderr, "ERROR: for presentation %u, dialog_gain in config file is %f dB, but the value from DSI is %f dB, please check your config file.\n", section->presentation_index, section->dialog_gain / 2.0, gain_from_es / 2.0);
+            exit(1);
+        }
+    }
+    AP4_DiapAtom *diap = new AP4_DiapAtom(section->dialog_gain);
+    udta->AddChild(diap);
+    prsl->AddChild(udta);
     if (section->group_label.ItemCount() > 0)
     {
         AP4_List<AP4_String>::Item *group_item = section->group_label.FirstItem();

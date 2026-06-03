@@ -772,6 +772,12 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
 
             preselection = xml.SubElement(period, 'Preselection', **kwargs)
 
+            if hasattr(preselection_entry,'dialog_gain'):
+                uri = 'tag:dolby.com,2018:dash:audio_dialog_gain:2025'
+                value = preselection_entry.dialog_gain / 2.0
+                value = str(round(value, 1)) if value != 0 else '0'
+                xml.SubElement(preselection, 'SupplementalProperty', schemeIdUri=uri, value=value)
+
             # Add Label from labels (after GroupLabel)
             for label in preselection_entry.labels:
                 args = [preselection]
@@ -784,6 +790,13 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                 kwargs['lang'] = label.language
                 lbl = xml.SubElement(*args, **kwargs)
                 lbl.text = label.label
+
+            # audio_dialog_gain for DE
+            if hasattr(preselection_entry,'dialog_gain'):
+                if preselection_entry.dialog_gain > 0:
+                    uri = 'urn:mpeg:dash:role:2011'
+                    value = 'enhanced-audio-intelligibility'
+                    xml.SubElement(preselection, 'Accessibility', schemeIdUri=uri, value=value)
 
             # Add Role/Accessibility from kinds
             role = None
@@ -821,18 +834,6 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                         xml.SubElement(preselection, 'Accessibility', schemeIdUri=acc_uri, value=accessibility)
                 if role:
                     xml.SubElement(preselection, 'Role', schemeIdUri=role_uri, value=role)
-
-            # audio_dialog_gain for DE
-            if hasattr(preselection_entry,'dialog_gain'):
-                if preselection_entry.dialog_gain > 0:
-                    uri = 'urn:mpeg:dash:role:2011'
-                    value = 'enhanced-audio-intelligibility'
-                    xml.SubElement(preselection, 'Accessibility', schemeIdUri=uri, value=value)
-
-                uri = 'tag:dolby.com,2018:dash:audio_dialog_gain:2025'
-                value = preselection_entry.dialog_gain / 2.0
-                value = str(round(value, 1)) if value != 0 else '0'
-                xml.SubElement(preselection, 'SupplementalProperty', schemeIdUri=uri, value=value)
 
     # save the MPD
     if options.mpd_filename:

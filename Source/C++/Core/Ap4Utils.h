@@ -262,10 +262,17 @@ public:
     AP4_Result   SkipBytes(AP4_Size byte_count);
     void         SkipBit();
     void         SkipBits(unsigned int bit_count);
-
+    AP4_UI32     ReadBytesLE(unsigned n_bytes);
+    void PrintBytes(AP4_Size byte_count);
     unsigned int GetBitsPosition();
 
     unsigned int GetBitsRead();
+    void ByteAlign();
+    unsigned int GetBitsAvailable() {
+        unsigned int total_bits = 8 * m_Buffer.GetDataSize();
+        unsigned int bits_read = GetBitsPosition();
+        return (bits_read < total_bits) ? (total_bits - bits_read) : 0;
+    }
 
 private:
     // methods
