@@ -404,7 +404,7 @@ class Label:
 class Kind:
     def __init__(self, atom):
         self.schemeURI  = atom['scheme_uri']
-        self.value      = atom['value']
+        self.value      = atom['value'] if 'value' in atom else None
 
 # Represents 'ardi' atom, including descriptions
 # TODO: could be just a string instead of a class / object

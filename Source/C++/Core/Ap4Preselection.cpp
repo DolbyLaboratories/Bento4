@@ -177,9 +177,9 @@ AP4_Preselection::parsePreselectionSection(ConfigSection *current_section, const
     {
         splitString(AP4_String(value), ',', current_section->group_label);
     }
-    else if (key_str == "extend_language")
+    else if (key_str == "extended_language")
     {
-        current_section->extend_language = AP4_String(value);
+        current_section->extended_language = AP4_String(value);
     }
     else if (key_str == "preselection_tag")
     {
@@ -193,17 +193,9 @@ AP4_Preselection::parsePreselectionSection(ConfigSection *current_section, const
     {
         splitString(AP4_String(value), ',', current_section->kind);
     }
-    else if (key_str == "kind_urn")
-    {
-        splitString(AP4_String(value), ',', current_section->kind_urn);
-    }
     else if (key_str == "audio_rendering_indication")
     {
         fprintf(stderr, "Warning: audio_rendering_indication is deprecated, will use the inforamtion in DSI instead.\n");
-    }
-    if (current_section->kind.ItemCount() != current_section->kind_urn.ItemCount() && current_section->kind_urn.ItemCount() != 0) {
-        fprintf(stderr, "ERROR: kind and kind_urn configuration is wrong.\n");
-        return AP4_FAILURE;
     }
     return AP4_SUCCESS;
 }
@@ -411,28 +403,30 @@ AP4_Preselection::applyConfig(AP4_PrslAtom *prsl, AP4_Dac4Atom::Ac4Dsi::Presenta
     prsl->AddChild(udta);
     if (section->group_label.ItemCount() > 0)
     {
-        AP4_List<AP4_String>::Item *group_item = section->group_label.FirstItem();
-        while (group_item)
+        AP4_List<AP4_String>::Item *label_item = section->group_label.FirstItem();
+        while (label_item)
         {
             AP4_List<AP4_String> split;
-            splitString(group_item->GetData()->GetChars(), ':', split);
-            if (split.ItemCount() != 3)
+            splitString(label_item->GetData()->GetChars(), '|', split);
+            if (split.ItemCount() == 2)
             {
-                fprintf(stderr, "ERROR: group label must be in the format lang:label:id\n");
-                group_item = group_item->GetNext();
-                continue;
+                AP4_LablAtom *labl = new AP4_LablAtom(true, 0, split.FirstItem()->GetData()->GetChars(), split.LastItem()->GetData()->GetChars());
+                prsl->AddChild(labl);
             }
-
-            AP4_UI16 id = 0;
-            id = static_cast<AP4_UI16>(std::atoi(split.LastItem()->GetData()->GetChars()));
-
-            AP4_String *group_lang, *group_text;
-            split.Get(0, group_lang);
-            split.Get(1, group_text);
-
-            AP4_LablAtom *labl = new AP4_LablAtom(true, id, group_lang->GetChars(), group_text->GetChars());
-            prsl->AddChild(labl);
-            group_item = group_item->GetNext();
+            else if (split.ItemCount() == 3)
+            {
+                AP4_UI16 id = static_cast<AP4_UI16>(std::atoi(split.LastItem()->GetData()->GetChars()));
+                AP4_String *label_lang, *label_text;
+                split.Get(0, label_lang);
+                split.Get(1, label_text);
+                AP4_LablAtom *labl = new AP4_LablAtom(true, id, label_lang->GetChars(), label_text->GetChars());
+                prsl->AddChild(labl);
+            }
+            else
+            {
+                fprintf(stderr, "ERROR: group_label must be in the format language|value[|id]\n");
+            }
+            label_item = label_item->GetNext();
         }
     }
     if (section->label.ItemCount() > 0)
@@ -441,34 +435,31 @@ AP4_Preselection::applyConfig(AP4_PrslAtom *prsl, AP4_Dac4Atom::Ac4Dsi::Presenta
         while (label_item)
         {
             AP4_List<AP4_String> split;
-            splitString(label_item->GetData()->GetChars(), ':', split);
-            if (split.ItemCount() < 2)
+            splitString(label_item->GetData()->GetChars(), '|', split);
+            if (split.ItemCount() == 2)
             {
-                fprintf(stderr, "ERROR: label must be in the format lang:label\n");
-                label_item = label_item->GetNext();
-                continue;
+                AP4_LablAtom *labl = new AP4_LablAtom(false, 0, split.FirstItem()->GetData()->GetChars(), split.LastItem()->GetData()->GetChars());
+                prsl->AddChild(labl);
             }
-
-            // ID of labels that belong to a group
-            // ID of labels that do not belong to a group is 0 by default
-            AP4_UI16 id = 0;
-            if (split.ItemCount() == 3)
+            else if (split.ItemCount() == 3)
             {
-                id = static_cast<AP4_UI16>(std::atoi(split.LastItem()->GetData()->GetChars()));
+                AP4_UI16 id = static_cast<AP4_UI16>(std::atoi(split.LastItem()->GetData()->GetChars()));
+                AP4_String *label_lang, *label_text;
+                split.Get(0, label_lang);
+                split.Get(1, label_text);
+                AP4_LablAtom *labl = new AP4_LablAtom(false, id, label_lang->GetChars(), label_text->GetChars());
+                prsl->AddChild(labl);
             }
-
-            AP4_String *label_lang, *label_text;
-            split.Get(0, label_lang);
-            split.Get(1, label_text);
-
-            AP4_LablAtom *labl = new AP4_LablAtom(false, id, label_lang->GetChars(), label_text->GetChars());
-            prsl->AddChild(labl);
+            else
+            {
+                fprintf(stderr, "ERROR: label must be in the format language|label[|id]\n");
+            }
             label_item = label_item->GetNext();
         }
     }
-    if (section->extend_language.GetLength() > 0)
+    if (section->extended_language.GetLength() > 0)
     {
-        AP4_ElngAtom *elng = new AP4_ElngAtom(section->extend_language.GetChars());
+        AP4_ElngAtom *elng = new AP4_ElngAtom(section->extended_language.GetChars());
         prsl->AddChild(elng);
     }
     if (section->preselection_tag.GetLength() > 0)
@@ -482,27 +473,35 @@ AP4_Preselection::applyConfig(AP4_PrslAtom *prsl, AP4_Dac4Atom::Ac4Dsi::Presenta
     if (section->kind.ItemCount() > 0)
     {
         AP4_List<AP4_String>::Item *kind_item = section->kind.FirstItem();
-        AP4_List<AP4_String>::Item *kind_urn_item = section->kind_urn.FirstItem();
 
         while (kind_item)
         {
-            if (kind_urn_item == NULL)
+            AP4_List<AP4_String> split;
+            splitString(kind_item->GetData()->GetChars(), '|', split);
+            if (split.ItemCount() == 1)
             {
-                AP4_KindAtom *kind_atom = new AP4_KindAtom(AP4_PRES_KIND_SCHEME_URI_DASH_URN, kind_item->GetData()->GetChars());
+                // use default scheme URI
+                AP4_KindAtom *kind_atom = new AP4_KindAtom(AP4_PRES_KIND_SCHEME_URI_DASH_URN, split.LastItem()->GetData()->GetChars());
                 prsl->AddChild(kind_atom);
-                kind_item = kind_item->GetNext();
+            }
+            else if (split.ItemCount() == 2)
+            {
+                if (*(split.FirstItem()->GetData()) == "NULL")
+                {
+                    AP4_KindAtom *kind_atom = new AP4_KindAtom(split.LastItem()->GetData()->GetChars(), NULL);
+                    prsl->AddChild(kind_atom);
+                }
+                else
+                {
+                    AP4_KindAtom *kind_atom = new AP4_KindAtom(split.LastItem()->GetData()->GetChars(), split.FirstItem()->GetData()->GetChars());
+                    prsl->AddChild(kind_atom);
+                }
             }
             else
             {
-                AP4_KindAtom *kind_atom = new AP4_KindAtom(kind_urn_item->GetData()->GetChars(), kind_item->GetData()->GetChars());
-                AP4_String kind_str(kind_item->GetData()->GetChars());
-                if (kind_str == "NULL") {
-                    kind_atom->SetValue(NULL);
-                }
-                prsl->AddChild(kind_atom);
-                kind_item = kind_item->GetNext();
-                kind_urn_item = kind_urn_item->GetNext();
+                fprintf(stderr, "ERROR: kind must be in the format value[|scheme_uri]\n");
             }
+            kind_item = kind_item->GetNext();
         }        
     }
     if (section->audio_rendering_indication_exist)

@@ -834,6 +834,8 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                         xml.SubElement(preselection, 'Accessibility', schemeIdUri=acc_uri, value=accessibility)
                 if role:
                     xml.SubElement(preselection, 'Role', schemeIdUri=role_uri, value=role)
+                else:
+                    xml.SubElement(preselection, 'Role', schemeIdUri=role_uri)
 
     # save the MPD
     if options.mpd_filename:

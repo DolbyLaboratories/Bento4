@@ -1,47 +1,98 @@
 Preselection in AC4
 =====
 
-This branch is a reference implementation of AC-4 preselection for ISO and DASH workflows. It is not fully compliant with *Dolby AC-4 Streams Within the ISO Base Media File Format Guidelines for Multiplexers v1.0*. Please do not use it as a reference for HLS packaging or for features beyond preselection.
+This branch is a reference implementation of AC-4 preselection for ISO and DASH workflows based on *Dolby AC-4 Streams Within the ISO Base Media File Format Guidelines for Multiplexers v1.1*. Please do not use it as a reference for HLS packaging or for features beyond preselection.
 
-Because preselection inputs can be complex, muxing is controlled through a configuration file.
+Due to the complexity of preselection inputs, a configuration file has been designed to control the muxing process. By default, preselection-related features in the MP4 file are **preserved** in both the **fragment file** and the **manifest** for convenience.
+
 See Documents/preselection_config.ini for an example.
-
-By default, preselection-related features are preserved in both the fragmented MP4 output and the generated manifest.
-
-Example workflow:
-
-```
-mp4mux --track ac4:main_5pres_live.ac4#language=und,label="en:Example Content in Dolby AC-4 with 5 pre-selections" --preselection config.ini test.mp4
-mp4fragment test.mp4 test_f.mp4
-python3 mp4-dash.py test_f.mp4
-```
 
 Configuration fields:
 
-* **presentation_index**: Position of the presentation in the DSI, starting at 0. Default: 0.
+* **presentation_index**
 
-* **track**: Track file name.
+    Indicates the order of this presentation in the DSI, starting from 0.
 
-* **dialog_gain**: Dialog gain in dB. Can be positive or negative.
+    If not specified, the default value is **0**.
 
-* **extend_language**: Extended language code(s). Use commas to separate multiple values (for example, en,de). If omitted, the value from the AC-4 DSI is used.
+* **track**
 
-* **selection_priority**: Preselection priority value. Higher values indicate higher preference when a player selects preselections.
+    Specifies the track file name.
 
-* **group_id**: Groups multiple tracks into a single preselection. If set for one preselection, it must be set for all preselections. If omitted, a value is assigned automatically.
+* **dialog_gain**
 
-* **kind**: DASH role for the preselection (for example, main, dub, and so on). If omitted, the role is derived from the stream.
+    Dialog gain value in **dB**.
 
-* **label**: Human-readable description of the preselection or track. You can prefix the label language using a colon (:). Multiple label parameters per track are supported. Language tags must follow IETF BCP 47.
+    Can be positive or negative.
 
-* **kind_urn**: Optional URN prefix for the role, separated by a space. Default: urn:mpeg:dash:role:2011. Multiple pres_kind entries are supported. Using pres_kind without parameters adds the default role derived from the stream. When multiple roles are used, **it is recommended to provide both kind and kind_urn**. For kind boxes that include only scheme_uri (without a value), set kind to NULL:
+* **extended_language**
 
+    Extended language code(s).
+
+    Multiple codes should be separated by commas (e.g., en,de).
+
+    If not specified, the value from the AC-4 DSI will be used.
+
+* **interleaving_tag**
+
+    Identifier for the interleaving process.
+
+* **selection_priority**
+
+    Specifies the selection priority.
+
+    A higher value of selection_priority indicates a higher preference when the player chooses preselections.
+
+* **group_id**
+
+    Groups multiple tracks into a single preselection.
+
+    If specified, it must be provided for all preselections.
+
+    If not set, a value will be automatically assigned.
+
+* **kind**
+
+    Specifies the **DASH role** of the preselection (e.g., main, dub, etc.).
+
+    If not specified, the value from the stream will be used. Multiple kind entries can be specified.
+
+    Scheme_uri is optional and defaulted to "urn:mpeg:dash:role:2011".
+
+    For kind boxes that only have scheme_uri without a value, set the value to "NULL".
+
+    Format: value[|scheme_uri][,value|scheme_uri]
+
+    Example: *kind = main*
+
+* **label**
+
+    Description of the preselection or track.
+
+    ID is optional and defaulted to 0. Multiple label parameters per track are supported.
+
+    The language must follow the **IETF BCP 47** format.
+
+    Format: language|label[|id][,language|label|id]
+
+    Example: *label = en|Standard Mode,es|Modo estándar*
+
+* **group_label**
+
+    Description of the preselections.
+
+    ID is optional and defaulted to 0. Multiple group label parameters are supported.
+
+    The language must follow the **IETF BCP 47** format.
+
+    Format: language|label[|id][,language|label|id]
+
+Example workflow:
+ 
 ```
-[Preselection_a]
-presentation_index = 0
-track = main_5pres_live.ac4
-kind = NULL
-kind_urn = example_scheme_uri
+mp4mux --track ac4:main_5pres_live.ac4#language=und,label="en:Example Content in Dolby AC-4 with 5 pre-selections" -preselection config.ini test.mp4
+mp4fragment test.mp4 test_f.mp4
+python3 mp4-dash.py test_f.mp4
 ```
 
 

@@ -91,8 +91,7 @@ class AP4_Preselection
         AP4_List<AP4_String> label;
         AP4_List<AP4_String> group_label;
         AP4_List<AP4_String> kind;
-        AP4_List<AP4_String> kind_urn;
-        AP4_String     extend_language;
+        AP4_String     extended_language;
     };
 public:
     AP4_Preselection (const char* config_file);
