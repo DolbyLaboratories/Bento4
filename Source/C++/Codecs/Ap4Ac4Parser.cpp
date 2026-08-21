@@ -61,7 +61,7 @@ AP4_Ac4Header::AP4_Ac4Header(const AP4_UI08* bytes, unsigned int size, bool head
 
     /* Begin to parse TOC */
     m_TocSize = bits.GetBitsPosition() / 8; // toc size initialized
-
+    
     m_BitstreamVersion = bits.ReadBits(2);
     if (m_BitstreamVersion == 3) {
         m_BitstreamVersion = AP4_Ac4VariableBits(bits, 2);
@@ -125,7 +125,7 @@ AP4_Ac4Header::AP4_Ac4Header(const AP4_UI08* bytes, unsigned int size, bool head
         unsigned int firstPresentationNSubstreamGroups = 0;
 
         if (m_NPresentations > 0){
-            m_PresentationV1 = new AP4_Dac4Atom::Ac4Dsi::PresentationV1[m_NPresentations];
+            m_PresentationV1= new AP4_Dac4Atom::Ac4Dsi::PresentationV1[m_NPresentations];
             AP4_SetMemory(m_PresentationV1, 0, m_NPresentations * sizeof(m_PresentationV1[0]));
         } else {
             m_PresentationV1 = NULL;
@@ -423,6 +423,7 @@ AP4_Ac4Parser::FindFrame(AP4_Ac4Frame& frame)
             // skip the sync word, assume it's 'fake' sync word
             m_Bits.SkipBytes(2);
         }
+        delete[] raw_header;
         return AP4_ERROR_NOT_ENOUGH_DATA;
     }
     // copy the whole frame because toc size is unknown
@@ -1511,7 +1512,7 @@ AP4_Result AP4_Ac4Parser::emdf_payloads_substream(AP4_BitReader& bits, AP4_Dac4A
         // dei_skip
         AP4_UI64 remaining_bits = 8 * emdf_payload_size - (dei_end - dei_start);
         if (remaining_bits > bits.GetBitsAvailable()) {
-            printf("WARNING: not enough bits for emdf payload, remaining_bits=%llu, bits_available=%llu\n", remaining_bits, bits.GetBitsAvailable());
+            printf("WARNING: Not enough bits for emdf payload, remaining_bits=%llu, bits_available=%llu\n", remaining_bits, bits.GetBitsAvailable());
             break;
         }
         bits.SkipBits(remaining_bits);
@@ -1610,7 +1611,7 @@ AP4_Result AP4_Ac4Parser::ac4_presentation_substream(AP4_BitReader& bits, AP4_Da
         AP4_UI32 add_data_bits = add_data_bytes * 8;
         unsigned mis = bits.GetBitsPosition() & 7;
         if (mis) bits.SkipBits(8 - mis);
-        presentation.d.v1.immersive_audio_indicator_in_es = bits.ReadBit()? immersive_audio_indicator_TRUE:immersive_audio_indicator_FALSE;
+        presentation.d.v1.immersive_audio_indicator_in_es = bits.ReadBit()? DOLBY_ATMOS_INDICATOR_TRUE:DOLBY_ATMOS_INDICATOR_FALSE;
         add_data_bits = add_data_bits - 1;
         int pres_ch_mode = presentation.GetPresentationChMode();
         if (pres_ch_mode == -1) {
@@ -1631,11 +1632,14 @@ AP4_Result AP4_Ac4Parser::ac4_presentation_substream(AP4_BitReader& bits, AP4_Da
             bits.ReadBits(6); // advanced_de_compr_thresh
             bits.ReadBits(5); // advanced_de_compr_gain
             advanced_de_data_bits += 11;
+            if (advanced_de_data_bits > add_data_bits) {
+                printf("WARN: advanced_de_data_bits (%d) exceed add_data_bits (%d)\n", advanced_de_data_bits, add_data_bits);
+            }
             add_data_bits = add_data_bits - advanced_de_data_bits;
         }
         bits.SkipBits(add_data_bits); // add_data
     } else {
-        presentation.d.v1.immersive_audio_indicator_in_es = immersive_audio_indicator_NONE;
+        presentation.d.v1.immersive_audio_indicator_in_es = DOLBY_ATMOS_INDICATOR_NONE;
     }
     AP4_UI08 dialnorm_bits = bits.ReadBits(7);
     AP4_UI08 b_further_loudness_info = bits.ReadBit();
@@ -1649,7 +1653,7 @@ AP4_Result AP4_Ac4Parser::ac4_presentation_substream(AP4_BitReader& bits, AP4_Da
     if (b_drc_more_bits) {
         drc_metadata_size += AP4_Ac4VariableBits(bits, 3) << 5;
     }
-    bits.SkipBits(drc_metadata_size * 8); // drc_frame(b_pres_ndot)
+    bits.SkipBits(drc_metadata_size); // drc_frame(b_pres_ndot)
 
     AP4_UI32 n_substream_groups = presentation.d.v1.n_substream_groups;
     if (n_substream_groups > 1) {

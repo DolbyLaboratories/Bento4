@@ -35,6 +35,7 @@
 #include "Ap4Types.h"
 
 #include <cmath>
+#include <initializer_list>
 
 /*----------------------------------------------------------------------
 |   dynamic cast support
@@ -119,6 +120,29 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const Ac4Dsi* ac4Dsi):
         //legacy presentation for IMS
         if (presentation.presentation_version == 2) {
             AP4_Dac4Atom::Ac4Dsi::PresentationV1 legacy_presentation = presentation;
+            // `presentation` owns substream_groups (and each group owns its substreams) via raw
+            // pointers. The struct assignment above only copies those pointers, not the pointed-to
+            // data, so legacy_presentation must get its own deep copy before it is written and
+            // modified independently - otherwise it aliases memory owned by `presentation`.
+            AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1* legacy_substream_groups = NULL;
+            if (presentation.d.v1.n_substream_groups > 0 && presentation.d.v1.substream_groups) {
+                legacy_substream_groups = new AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1[presentation.d.v1.n_substream_groups];
+                for (unsigned int sg = 0; sg < presentation.d.v1.n_substream_groups; sg++) {
+                    legacy_substream_groups[sg] = presentation.d.v1.substream_groups[sg];
+                    unsigned int n_substreams = presentation.d.v1.substream_groups[sg].d.v1.n_substreams;
+                    if (n_substreams > 0 && presentation.d.v1.substream_groups[sg].d.v1.substreams) {
+                        AP4_Dac4Atom::Ac4Dsi::SubStream* legacy_substreams = new AP4_Dac4Atom::Ac4Dsi::SubStream[n_substreams];
+                        AP4_CopyMemory(legacy_substreams,
+                                       presentation.d.v1.substream_groups[sg].d.v1.substreams,
+                                       n_substreams * sizeof(AP4_Dac4Atom::Ac4Dsi::SubStream));
+                        legacy_substream_groups[sg].d.v1.substreams = legacy_substreams;
+                    } else {
+                        legacy_substream_groups[sg].d.v1.substreams = NULL;
+                    }
+                }
+                legacy_presentation.d.v1.substream_groups = legacy_substream_groups;
+            }
+
             if (legacy_presentation.d.v1.b_presentation_id == 0 && legacy_presentation.d.v1.b_extended_presentation_id == 0) {
                 fprintf(stderr, "WARN: Need presentation_id for IMS signal.\n");
             }
@@ -132,6 +156,13 @@ AP4_Dac4Atom::AP4_Dac4Atom(AP4_UI32 size, const Ac4Dsi* ac4Dsi):
             unsigned int pres_bytes_idx = bits.GetBitCount() / 8 - 1;
             legacy_presentation.WritePresentationV1Dsi(bits);
             Ap4_Ac4UpdatePresBytes(bits.GetData(), pres_bytes_idx, bits.GetBitCount()/8 - pres_bytes_idx - 1);
+
+            if (legacy_substream_groups) {
+                for (unsigned int sg = 0; sg < presentation.d.v1.n_substream_groups; sg++) {
+                    delete[] legacy_substream_groups[sg].d.v1.substreams;
+                }
+                delete[] legacy_substream_groups;
+            }
         }
     }
     m_RawBytes.SetData(bits.GetData(), bits.GetBitCount() / 8);
@@ -745,10 +776,8 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
     }
     n_objs = 0;
     if (bits.ReadBit()) {                       // b_dynamic_objects
-        b_substream_contains_dynamic_objects = 1;
-        unsigned int b_lfe = bits.ReadBit();    // b_lfe
+        b_lfe = bits.ReadBit();    // b_lfe
         if (defalut_presentation_flag && b_lfe) { channel_count += 1; }
-        b_substream_contains_dynamic_objects |= 1;
         // Populate obj_type for dynamic objects
         for (int i = 0; i < nSignals && n_objs < MAX_OBJ_COUNT; i++) {
             if (b_lfe && i == 0) {
@@ -761,6 +790,12 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
             obj_b_ajoc_coded[n_objs] = 0;
             n_objs++;
         }
+        b_substream_contains_dynamic_objects = 1;
+        // Determine if the substream contains dynamic objects based on LFE and object code
+        // Only if there is no LFE or the object code is not zero, the substream contains dynamic objects
+        if (!b_lfe || nObjectsCode != 0) {
+            b_substream_contains_dynamic_objects_no_lfe = 1;
+        }
     } else {
         if (bits.ReadBit()) {                   // b_bed_objects
             b_substream_contains_bed_objects = 1;
@@ -770,6 +805,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                     bed_chan_assign_code = bits.ReadBits(3); 
                     if (nSignals > BedNumFromAssignCode(bed_chan_assign_code)) {
                         b_substream_contains_dynamic_objects |= 1;
+                        b_substream_contains_dynamic_objects_no_lfe |= 1;
                     }
                     // Populate obj_type for bed channel assign code
                     unsigned int bedNum = BedNumFromAssignCode(bed_chan_assign_code);
@@ -790,6 +826,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                         }
                         if (nSignals > bedNum) {
                             b_substream_contains_dynamic_objects |= 1;
+                            b_substream_contains_dynamic_objects_no_lfe |= 1;
                         }
                         // Populate obj_type for nonstd bed channel assignment
                         // bit i of stored int corresponds to spec array index [16-i]
@@ -811,6 +848,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                         }
                         if (nSignals > bedNum) {
                             b_substream_contains_dynamic_objects |= 1;
+                            b_substream_contains_dynamic_objects_no_lfe |= 1;
                         }
                         // Populate obj_type for std bed channel assignment
                         // bit i of stored int corresponds to spec array index [9-i]
@@ -836,6 +874,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                     unsigned char isf_config = bits.ReadBits(3);           // isf_config
                     if ((unsigned int)nSignals > ObjNumFromIsfConfig(isf_config)) {
                         b_substream_contains_dynamic_objects |= 1;
+                        b_substream_contains_dynamic_objects_no_lfe |= 1;
                     }
                     // Populate obj_type for ISF objects
                     unsigned int nIsf = ObjNumFromIsfConfig(isf_config);
@@ -927,6 +966,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode(AP4_BitReader &bits, int presentati
     switch (channel_mode_code) {
         case 120:                   // 0b1111000
             if (presentationVersion == 2) { // IMS (all content)
+                immersive_audio_indicator = 0;
                 return CH_MODE_STEREO;
             }
             else {                  // 7.0: 3/4/0
@@ -934,7 +974,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseChMode(AP4_BitReader &bits, int presentati
             }
         case 121:                   // 0b1111001
             if (presentationVersion == 2) { // IMS (Atmos content)
-                immersive_audio_indicator |= 1;
+                immersive_audio_indicator = 1;
                 return CH_MODE_STEREO;
             }
             else {                  // 7.1: 3/4/0.1
@@ -1022,6 +1062,7 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                 b_substream_contains_ISF_objects |= 1;
                 if (nSignals > n_isf) {
                     b_substream_contains_dynamic_objects |= 1;
+                    b_substream_contains_dynamic_objects_no_lfe |= 1;
                 }
             }
         } else {
@@ -1040,7 +1081,10 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                     b_substream_contains_bed_objects |= 1;
                     if (nSignals > BedNumFromAssignCode(bed_chan_assign_code)) {
                         b_substream_contains_dynamic_objects |= 1;
+                        b_substream_contains_dynamic_objects_no_lfe |= 1;
                     }
+                    bed_chan_assign_code_upmix = bed_chan_assign_code;
+                    b_ch_assign_code_upmix = b_ch_assign_code;
                 }
             } else {
                 b_channel_assignment_flags_present = bits.ReadBit();
@@ -1048,7 +1092,6 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                     b_nonstd_bed_channel_assignment_flags_present = bits.ReadBit();
                     if (b_nonstd_bed_channel_assignment_flags_present) {
                         nonstd_bed_channel_assignment_flag = bits.ReadBits(17);
-
                         for (int i = 0; i < 17; i++) {
                             if ((nonstd_bed_channel_assignment_flag >> (16 - i)) & 0x1) {
                                 if (i != 3 && i != 16) {
@@ -1064,7 +1107,11 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                             }
                             if (nSignals > bed_num) {
                                 b_substream_contains_dynamic_objects |= 1;
+                                b_substream_contains_dynamic_objects_no_lfe |= 1;
                             }
+                            b_nonstd_bed_channel_assignment_flags_present_upmix = b_nonstd_bed_channel_assignment_flags_present;
+                            b_channel_assignment_flags_present_upmix = b_channel_assignment_flags_present;
+                            nonstd_bed_channel_assignment_flag_upmix = nonstd_bed_channel_assignment_flag;
                         }
                     } else {
                         std_bed_channel_assignment_flag = bits.ReadBits(10);
@@ -1088,7 +1135,9 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                             }
                             if (nSignals > bed_num) {
                                 b_substream_contains_dynamic_objects |= 1;
+                                b_substream_contains_dynamic_objects_no_lfe |= 1;
                             }
+                            std_bed_channel_assignment_flag_upmix = std_bed_channel_assignment_flag;
                         }
                     }
                 } else {
@@ -1100,14 +1149,12 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                         nBedSignals = 1;
                     }
 
-                    nonstd_bed_channel_assignment_flag = 0;
                     for (unsigned int b = 0; b < nBedSignals; b++) {
-                        b_channel_assignment_flags_present = 1;
-                        nonstd_bed_channel_assignment = bits.ReadBits(4);
-                        nonstd_bed_channel_assignment_flag |= (1 << nonstd_bed_channel_assignment);
-
-                        // spec: if (nonstd_bed_channel_assignment != 3)
-                        if (nonstd_bed_channel_assignment != 3) {
+                        b_nonstd_bed_channel_assignment = 1;
+                        unsigned int assignment = bits.ReadBits(4);
+                        // nonstd_bed_channel_assignment=3 is reserved from Table 66.
+                        if (assignment != 3) {
+                            nonstd_bed_channel_assignment |= (1u << assignment);
                             push_obj(OBJ_TYPE_BED, 0, 1);
                         }
                     }
@@ -1116,14 +1163,18 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::BedDynObjAssignment(AP4_BitReader &bits,
                         b_substream_contains_bed_objects |= 1;
                         if (nSignals > nBedSignals) {
                             b_substream_contains_dynamic_objects |= 1;
+                            b_substream_contains_dynamic_objects_no_lfe |= 1;
                         }
-                    }
+                        b_nonstd_bed_channel_assignment_upmix = b_nonstd_bed_channel_assignment;
+                        nonstd_bed_channel_assignment_upmix = nonstd_bed_channel_assignment;
+                    } 
                 }
             }
         }
     } else {
         if (is_upmix) {
             b_substream_contains_dynamic_objects |= 1;
+            b_substream_contains_dynamic_objects_no_lfe |= 1;
             b_substream_contains_bed_objects     |= 0;
             b_substream_contains_ISF_objects     |= 0;
         }
@@ -1809,10 +1860,11 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::WritePresentationV1Dsi(AP4_BitWriter &bits
         bits.Write(d.v1.dsi_frame_rate_fraction_info, 2);
         bits.Write(d.v1.presentation_emdf_version, 5);
         bits.Write(d.v1.presentation_key_id, 10);
-        d.v1.b_presentation_channel_coded = ((GetPresentationChMode() == -1) ? 0: 1);
+        int pres_ch_mode = GetDsiPresentationChMode();
+        d.v1.b_presentation_channel_coded = ((pres_ch_mode == -1) ? 0: 1);
         bits.Write(d.v1.b_presentation_channel_coded, 1);
         if (d.v1.b_presentation_channel_coded == 1) {
-            d.v1.dsi_presentation_ch_mode = GetPresentationChMode();
+            d.v1.dsi_presentation_ch_mode = pres_ch_mode;
             bits.Write(d.v1.dsi_presentation_ch_mode, 5);
             if (d.v1.dsi_presentation_ch_mode >= 11 && d.v1.dsi_presentation_ch_mode <= 14){
                 GetPresB4BackChannelsPresent();
@@ -1902,12 +1954,17 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::WritePresentationV1Dsi(AP4_BitWriter &bits
     d.v1.de_indicator |= d.v1.b_dialog_max_gain;
     bits.Write(d.v1.de_indicator, 1);
 
-    if (d.v1.immersive_audio_indicator_in_es == immersive_audio_indicator_NONE) {
-        printf("Warning: Calculate immersive_audio_indicator according to deprecated method since it is not present in ES\n");
-        CalculateAtmosIndicator();
+    if (presentation_version == 2) {
+        // IMS shall set the immersive_audio_indicator according to the channel mode
         bits.Write(d.v1.immersive_audio_indicator, 1);
     } else {
-        bits.Write(d.v1.immersive_audio_indicator_in_es, 1);
+        if (d.v1.immersive_audio_indicator_in_es == DOLBY_ATMOS_INDICATOR_NONE) {
+            printf("Warning: Calculate immersive_audio_indicator according to deprecated method since it is not present in ES\n");
+            CalculateAtmosIndicator();
+            bits.Write(d.v1.immersive_audio_indicator, 1);
+        } else {
+            bits.Write(d.v1.immersive_audio_indicator_in_es, 1);
+        }
     }
     
     bits.Write(0, 4);       //reserved bits
@@ -2020,16 +2077,16 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::ParseDSIFrameRateFractionsInfo(AP4_BitRead
 {
      if (frame_rate_idx >= 5 && frame_rate_idx <= 9) {
         if (bits.ReadBit() == 1) {      // b_frame_rate_fraction
-            d.v1.dsi_frame_rate_fraction_info = 1;
+            d.v1.dsi_frame_rate_fraction_info = 2;
         }else{
             d.v1.dsi_frame_rate_fraction_info = 0;
         }
     }else if (frame_rate_idx >= 10 && frame_rate_idx <= 12){
         if (bits.ReadBit() == 1) {      // b_frame_rate_fraction
             if (bits.ReadBit() == 1) {  // b_frame_rate_fraction_is_4
-                d.v1.dsi_frame_rate_fraction_info = 2;
+                d.v1.dsi_frame_rate_fraction_info = 4;
             } else {
-                d.v1.dsi_frame_rate_fraction_info = 1;
+                d.v1.dsi_frame_rate_fraction_info = 2;
             }
         
         }else{
@@ -2122,7 +2179,6 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChMode()
 {
     int pres_ch_mode = -1;
     char b_obj_or_ajoc = 0;
-    // TODO: n_substream_groups
     for (unsigned int sg = 0; sg < d.v1.n_substream_groups; sg++){
         AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1 &substream_group = d.v1.substream_groups[sg];
         unsigned int n_substreams = d.v1.substream_groups[sg].d.v1.n_substreams;
@@ -2135,15 +2191,37 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChMode()
             }
         }
     }
+    if (b_obj_or_ajoc) {
+        return -1;
+    }
+    return pres_ch_mode;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetDsiPresentationChMode
++---------------------------------------------------------------------*/
+AP4_Result 
+AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetDsiPresentationChMode()
+{
+    // The algorithm is described in https://confluence.dolby.net/kb/spaces/sdq/pages/775100955/Signaling+channel-config+in+AC-4+DSI+for+object-based+presentations
+    int pres_ch_mode = GetPresentationChMode();
     bool b_has_dyn = 0;
     bool b_has_isf = 0;
     unsigned int merged_mask = 0;
-    if (b_obj_or_ajoc == 1) { 
-        // derive an appropriate channel configuration from the first substream group (Dolby AC-4 Streams Within the ISO Base Media File Format)
+    if (pres_ch_mode == -1) { 
+        // Derive an appropriate channel configuration from the first substream group (Dolby AC-4 Streams Within the ISO Base Media File Format)
         AP4_Dac4Atom::Ac4Dsi::SubStreamGroupV1 &substream_group = d.v1.substream_groups[0];
+        if (substream_group.d.v1.b_channel_coded) {
+            pres_ch_mode = -1;
+            for (unsigned int sus = 0; sus < substream_group.d.v1.n_substreams; sus++){
+                AP4_Dac4Atom::Ac4Dsi::SubStream &substream = substream_group.d.v1.substreams[sus];
+                pres_ch_mode = AP4_Ac4SuperSet(pres_ch_mode, substream.ch_mode);
+            }
+            return pres_ch_mode;
+        }
         for (unsigned int sus = 0; sus < substream_group.d.v1.n_substreams; sus++){
             AP4_Dac4Atom::Ac4Dsi::SubStream &substream = substream_group.d.v1.substreams[sus];
-            if (substream.b_substream_contains_dynamic_objects == 1) {
+            if (substream.b_substream_contains_dynamic_objects_no_lfe == 1) {
                 b_has_dyn = 1;
             }
             if (substream.b_substream_contains_ISF_objects == 1) {
@@ -2151,6 +2229,9 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChMode()
             }
             AP4_UI32 substream_channel_mask = substream.GetObjChannelMask();
             merged_mask |= substream_channel_mask;
+            if (substream.b_lfe) {
+                merged_mask |= 0x0008; // LFE bit
+            }
         }
         if (!b_has_dyn && !b_has_isf){
             pres_ch_mode = ConvertCSpeakerLayoutToChannelMode(merged_mask);
@@ -2161,71 +2242,107 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChMode()
     return pres_ch_mode;
 }
 
-int AP4_Dac4Atom::Ac4Dsi::PresentationV1::ConvertCSpeakerLayoutToChannelMode(AP4_UI32 channel_mask)
+static AP4_UI32
+AP4_Ac4MakeSpeakerMask(std::initializer_list<AP4_Ac4ObjSpeakerIndex> speakers)
 {
-    // Table 88
-    int ch_mode = 0;
-    // bit 0-16:  L R C LFE Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw LFE2
-    switch (channel_mask) {
-        // Mono
-        case 0x00001:  // bit 0: L
-            ch_mode = 0;
-            break;
-        // Stereo
-        case 0x00003:  // bit 0,1: L,R
-            ch_mode = 1;
-            break;
-        // 3.0
-        case 0x00007:  // bit 0,1,2: L,R,C
-            ch_mode = 2;
-            break;
-        // 5.0
-        case 0x00037:  // bit 0,1,2,4,5: L,R,C,Ls,Rs
-            ch_mode = 3;
-            break;
-        // 5.1
-        case 0x0003F:  // bit 0,1,2,3,4,5: L,R,C,LFE,Ls,Rs
-            ch_mode = 4;
-            break;
-        // 7.0: 3/4/0 (L, C, R, Ls, Rs, Lb, Rb)
-        case 0x000F7:  // bit 0,1,2,4,5,6,7
-            ch_mode = 5;
-            break;
-        // 7.1: 3/4/0.1 (L, C, R, Ls, Rs, Lb, Rb, LFE) 
-        case 0x000FF:  // bit 0,1,2,3,4,5,6,7
-            ch_mode = 6;
-            break;
-        // 7.0: 5/2/0 (L, C, R, Lw, Rw, Ls, Rs
-        case 0xC037:  // bit 0,1,2,4,5,14,15
-            ch_mode = 7;
-            break;
-        // 7.1: 5/2/0.1 (L, C, R, Lw, Rw, Ls, Rs, LFE)
-        case 0xC03F:  // bit 0,1,2,3,4,5,14,15
-            ch_mode = 8;
-            break;
-        // 7.0: 3/2/2 (L, C, R, Ls, Rs, Tfl, Tfr) 
-        case 0x00337:  // bit 0,1,2,4,5,8,9
-            ch_mode = 9;
-            break;
-        // 7.1: 3/2/2.1 (L, C, R, Ls, Rs, Tfl, Tfr, LFE) 
-        case 0x0033F:  // bit 0,1,2,3,4,5,8,9
-            ch_mode = 10;
-            break;
-        default:
-            ch_mode = -1;
-            break;
+    AP4_UI32 mask = 0;
+    for (AP4_Ac4ObjSpeakerIndex speaker : speakers) {
+        mask |= (1u << speaker);
     }
-    return ch_mode;
+    return mask;
 }
 
-static inline void AP4_Ac4SetIfChannel(AP4_UI32 nonstd_mask, int array_pos, int speaker_index, AP4_UI32& channel_mask)
+namespace {
+    struct AP4_Ac4ChannelModeEntry {
+        AP4_UI32 mask;
+        int      ch_mode;
+    };
+}
+
+int AP4_Dac4Atom::Ac4Dsi::PresentationV1::ConvertCSpeakerLayoutToChannelMode(AP4_UI32 channel_mask)
+{
+    // Table 88 - each layout is described as a list of speakers (see AP4_Ac4ObjSpeakerIndex)
+    static const AP4_Ac4ChannelModeEntry channel_modes[] = {
+        // Mono
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L}), CH_MODE_MONO},  
+        // Stereo: L, R
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R}), CH_MODE_STEREO},  
+        // 3.0: L, R, C
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C}), CH_MODE_3_0},  // 3.0
+        // 5.0: L, R, C, LS, RS
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS}), CH_MODE_5_0},  // 5.0
+        // 5.1: L, R, C, LFE, LS, RS
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS}), CH_MODE_5_1},  // 5.1
+        // 7.0: 3/4/0 (L, C, R, Ls, Rs, Lb, Rb) 
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB}), CH_MODE_70_34},  // 7.0: 3/4/0
+        // 7.1: 3/4/0.1 (L, C, R, Ls, Rs, Lb, Rb, LFE)
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB}), CH_MODE_71_34},  // 7.1: 3/4/0.1
+        // 7.0: 5/2/0 (L, C, R, Lw, Rw, Ls, Rs)  
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LW, AP4_AC4_SPEAKER_RW}), CH_MODE_70_52},  // 7.0: 5/2/0
+        // 7.1: 5/2/0.1 (L, C, R, Lw, Rw, Ls, Rs, LFE)
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LW, AP4_AC4_SPEAKER_RW}), CH_MODE_71_52},  // 7.1: 5/2/0.1
+        // 7.0: 3/2/2 (L, C, R, Ls, Rs, Tfl, Tfr) 
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR}), CH_MODE_70_322},  // 7.0: 3/2/2
+        // 7.1: 3/2/2.1 (L, C, R, Ls, Rs, Tfl, Tfr, LFE)
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR}), CH_MODE_71_322},  // 7.1: 3/2/2.1
+        // 7.0.4: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr 
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR,
+                                  AP4_AC4_SPEAKER_TBL, AP4_AC4_SPEAKER_TBR}), CH_MODE_7_0_4},
+        // 7.1.4: L, R, C, LFE, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR,
+                                  AP4_AC4_SPEAKER_TBL, AP4_AC4_SPEAKER_TBR}), CH_MODE_7_1_4},  // 7.1.4
+        // 9.0.4: L,R,C,LS,RS,LB,RB,TFL,TFR,TBL,TBR,LW,RW
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR,
+                                  AP4_AC4_SPEAKER_TBL, AP4_AC4_SPEAKER_TBR,
+                                  AP4_AC4_SPEAKER_LW, AP4_AC4_SPEAKER_RW}), CH_MODE_9_0_4},  // 9.0.4
+        // 9.1.4: L,R,C,LFE,LS,RS,LB,RB,TFL,TFR,TBL,TBR,LW,RW
+        {AP4_Ac4MakeSpeakerMask({AP4_AC4_SPEAKER_L, AP4_AC4_SPEAKER_R, AP4_AC4_SPEAKER_C, AP4_AC4_SPEAKER_LFE,
+                                  AP4_AC4_SPEAKER_LS, AP4_AC4_SPEAKER_RS,
+                                  AP4_AC4_SPEAKER_LB, AP4_AC4_SPEAKER_RB,
+                                  AP4_AC4_SPEAKER_TFL, AP4_AC4_SPEAKER_TFR,
+                                  AP4_AC4_SPEAKER_TBL, AP4_AC4_SPEAKER_TBR,
+                                  AP4_AC4_SPEAKER_LW, AP4_AC4_SPEAKER_RW}), CH_MODE_9_1_4},  // 9.1.4
+    };
+
+    for (const AP4_Ac4ChannelModeEntry& entry : channel_modes) {
+        if (entry.mask == channel_mask) {
+            return entry.ch_mode;
+        }
+    }
+    return -1;
+}
+
+static inline void AP4_Ac4SetIfChannel(AP4_UI32 nonstd_mask, int array_pos, AP4_Ac4ObjSpeakerIndex speaker_index, AP4_UI32& channel_mask)
 {
     if (nonstd_mask & (1u << array_pos)) {
         channel_mask |= (1u << speaker_index);
     }
 }
 
-static inline void AP4_Ac4SetBitChannel(AP4_UI32& mask, int speaker_index)
+static inline void AP4_Ac4SetBitChannel(AP4_UI32& mask, AP4_Ac4ObjSpeakerIndex speaker_index)
 {
     mask |= (1u << speaker_index);
 }
@@ -2233,169 +2350,123 @@ static inline void AP4_Ac4SetBitChannel(AP4_UI32& mask, int speaker_index)
 AP4_UI32
 AP4_Dac4Atom::Ac4Dsi::SubStream::GetObjChannelMask()
 {
-    AP4_UI32 channel_mask = 0; // bit 0-16:  L R C LFE Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw LFE2
+    AP4_UI32 channel_mask = 0; // see AP4_Ac4ObjSpeakerIndex for bit-to-speaker mapping
     // Convert bed_chan_assign_code to channel mask (AC-4 Table 62)
+    AP4_UI08 b_ch_assign_code = b_ajoc ? this->b_ch_assign_code_upmix : this->b_ch_assign_code;
+    AP4_UI32 bed_chan_assign_code = b_ajoc ? this->bed_chan_assign_code_upmix : this->bed_chan_assign_code;
+    AP4_UI08 b_nonstd_bed_channel_assignment_flags_present = b_ajoc ? this->b_nonstd_bed_channel_assignment_flags_present_upmix : this->b_nonstd_bed_channel_assignment_flags_present;
+    AP4_UI08 b_channel_assignment_flags_present = b_ajoc ? this->b_channel_assignment_flags_present_upmix : this->b_channel_assignment_flags_present;
+    AP4_UI08 b_nonstd_bed_channel_assignment = b_ajoc ? this->b_nonstd_bed_channel_assignment_upmix : this->b_nonstd_bed_channel_assignment;
+    AP4_UI32 nonstd_bed_channel_assignment = b_ajoc ? this->nonstd_bed_channel_assignment_upmix : this->nonstd_bed_channel_assignment;
+    AP4_UI32 nonstd_bed_channel_assignment_flag = b_ajoc ? this->nonstd_bed_channel_assignment_flag_upmix : this->nonstd_bed_channel_assignment_flag;
+    AP4_UI32 std_bed_channel_assignment_flag = b_ajoc ? this->std_bed_channel_assignment_flag_upmix : this->std_bed_channel_assignment_flag;
     if (b_ch_assign_code) {
         switch (bed_chan_assign_code) {
             case 0: // 2.0 (L, R)
             {
-                AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
                 break;
             }
             case 1: // 3.0 (L, C, R)
             {
-                AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
                 break;
             }
             case 2: // 5.0.0 (L, R, C, Ls, Rs) || 5.1.0 (L, R, C, LFE, Ls, Rs)
             {
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
                 break;
             }
-            case 3: // 5.0.2 (L, R, C, Ls, Rs, Tsl, Tsr) || 5.1.2 (L, R, C, LFE, Ls, Rs, Tsl, Tsr)  
+            case 3: // 5.0.2 (L, R, C, Ls, Rs, Tsl, Tsr) || 5.1.2 (L, R, C, LFE, Ls, Rs, Tsl, Tsr)
             {
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
-                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
-                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TSL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TSR);
                 break;
             }
-            case 4: 
+            case 4:
             {
                 // 5.0.4 (L, R, C, Ls, Rs, Tfl, Tfr, Tbl, Tbr ) || 5.1.4 (L, R, C, LFE, Ls, Rs, Tfl, Tfr, Tbl, Tbr )
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
-                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
-                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
-                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
-                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
-                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
-                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TFL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TFR);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TBL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TBR);
                 break;
             }
-            case 5: 
+            case 5:
             {
                 // 7.0.0 (L,C,R,Ls,Rs,Lb,Rb) || 7.1.0 (L,C,R,LFE,Ls,Rs,Lb,Rb)
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LB);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RB);
                 break;
             }
-            case 6: 
+            case 6:
             {
                 // 7.0.2 (L,C,R,Ls,Rs,Lb,Rb,Tsl,Tsr) || 7.1.2 (L,C,R,LFE,Ls,Rs,Lb,Rb,Tsl,Tsr)
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
-                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
-                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
-                    AP4_Ac4SetBitChannel(channel_mask, 10); // bit 10: Tsl
-                    AP4_Ac4SetBitChannel(channel_mask, 11); // bit 11: Tsr
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LB);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RB);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TSL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TSR);
                 break;
             }
-            case 7: 
+            case 7:
             {
                 // 7.0.4 (L,C,R,Ls,Rs,Lb,Rb,Tfl,Tfr,Tbl,Tbr) || 7.1.4 (L,C,R,LFE,Ls,Rs,Lb,Rb,Tfl,Tfr,Tbl,Tbr)
-                if (b_ajoc) {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
-                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
-                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
-                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
-                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
-                } else {
-                    AP4_Ac4SetBitChannel(channel_mask, 0);  // bit 0: L
-                    AP4_Ac4SetBitChannel(channel_mask, 1);  // bit 1: R
-                    AP4_Ac4SetBitChannel(channel_mask, 2);  // bit 2: C
-                    AP4_Ac4SetBitChannel(channel_mask, 3);  // bit 3: LFE
-                    AP4_Ac4SetBitChannel(channel_mask, 4);  // bit 4: Ls
-                    AP4_Ac4SetBitChannel(channel_mask, 5);  // bit 5: Rs
-                    AP4_Ac4SetBitChannel(channel_mask, 6);  // bit 6: Lb
-                    AP4_Ac4SetBitChannel(channel_mask, 7);  // bit 7: Rb
-                    AP4_Ac4SetBitChannel(channel_mask, 8);  // bit 8: Tfl
-                    AP4_Ac4SetBitChannel(channel_mask, 9);  // bit 9: Tfr
-                    AP4_Ac4SetBitChannel(channel_mask, 12); // bit 12: Tbl
-                    AP4_Ac4SetBitChannel(channel_mask, 13); // bit 13: Tbr
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_L);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_R);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_C);
+                if (!b_ajoc) {
+                    AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LFE);
                 }
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RS);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_LB);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_RB);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TFL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TFR);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TBL);
+                AP4_Ac4SetBitChannel(channel_mask, AP4_AC4_SPEAKER_TBR);
                 break;
             }
             default:
@@ -2403,48 +2474,68 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::GetObjChannelMask()
                 break;
         }
     }
-    
+
     // Convert bed_channel_assignment_flag to channel mask (AC-4 Table 64)
     if (b_nonstd_bed_channel_assignment_flags_present) {
         uint32_t nonstd_mask = nonstd_bed_channel_assignment_flag;
-        AP4_Ac4SetIfChannel(nonstd_mask, 16, 0, channel_mask);   // L
-        AP4_Ac4SetIfChannel(nonstd_mask, 15, 1, channel_mask);   // R
-        AP4_Ac4SetIfChannel(nonstd_mask, 14, 2, channel_mask);   // C
-        AP4_Ac4SetIfChannel(nonstd_mask, 13, 3, channel_mask);   // LFE
-        AP4_Ac4SetIfChannel(nonstd_mask, 12, 4, channel_mask);   // Ls
-        AP4_Ac4SetIfChannel(nonstd_mask, 11, 5, channel_mask);   // Rs
-        AP4_Ac4SetIfChannel(nonstd_mask, 10, 6, channel_mask);   // Lb
-        AP4_Ac4SetIfChannel(nonstd_mask,  9, 7, channel_mask);   // Rb
-        AP4_Ac4SetIfChannel(nonstd_mask,  8, 8, channel_mask);   // Tfl
-        AP4_Ac4SetIfChannel(nonstd_mask,  7, 9, channel_mask);   // Tfr
-        AP4_Ac4SetIfChannel(nonstd_mask,  6, 10, channel_mask);  // Tsl
-        AP4_Ac4SetIfChannel(nonstd_mask,  5, 11, channel_mask);  // Tsr
-        AP4_Ac4SetIfChannel(nonstd_mask,  4, 12, channel_mask);  // Tbl
-        AP4_Ac4SetIfChannel(nonstd_mask,  3, 13, channel_mask);  // Tbr
-        AP4_Ac4SetIfChannel(nonstd_mask,  2, 14, channel_mask);  // Lw
-        AP4_Ac4SetIfChannel(nonstd_mask,  1, 15, channel_mask);  // Rw
-        AP4_Ac4SetIfChannel(nonstd_mask,  0, 16, channel_mask);  // LFE2
+        AP4_Ac4SetIfChannel(nonstd_mask, 16, AP4_AC4_SPEAKER_L,    channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 15, AP4_AC4_SPEAKER_R,    channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 14, AP4_AC4_SPEAKER_C,    channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 13, AP4_AC4_SPEAKER_LFE,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 12, AP4_AC4_SPEAKER_LS,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 11, AP4_AC4_SPEAKER_RS,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 10, AP4_AC4_SPEAKER_LB,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  9, AP4_AC4_SPEAKER_RB,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  8, AP4_AC4_SPEAKER_TFL,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  7, AP4_AC4_SPEAKER_TFR,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  6, AP4_AC4_SPEAKER_TSL,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  5, AP4_AC4_SPEAKER_TSR,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  4, AP4_AC4_SPEAKER_TBL,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  3, AP4_AC4_SPEAKER_TBR,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  2, AP4_AC4_SPEAKER_LW,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  1, AP4_AC4_SPEAKER_RW,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  0, AP4_AC4_SPEAKER_LFE2, channel_mask);
+    }
+    // Convert nonstd_bed_channel_assignment to channel mask (AC-4 Table 66)
+    if (b_nonstd_bed_channel_assignment) {
+        uint32_t nonstd_mask = nonstd_bed_channel_assignment;
+        AP4_Ac4SetIfChannel(nonstd_mask,  0, AP4_AC4_SPEAKER_L,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  1, AP4_AC4_SPEAKER_R,   channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  2, AP4_AC4_SPEAKER_C,   channel_mask);
+        // position 3 is "reserved" per Table 66 note (LFE not applicable here), intentionally skipped
+        AP4_Ac4SetIfChannel(nonstd_mask,  4, AP4_AC4_SPEAKER_LS,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  5, AP4_AC4_SPEAKER_RS,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  6, AP4_AC4_SPEAKER_LB,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  7, AP4_AC4_SPEAKER_RB,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  8, AP4_AC4_SPEAKER_TFL, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask,  9, AP4_AC4_SPEAKER_TFR, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 10, AP4_AC4_SPEAKER_TSL, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 11, AP4_AC4_SPEAKER_TSR, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 12, AP4_AC4_SPEAKER_TBL, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 13, AP4_AC4_SPEAKER_TBR, channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 14, AP4_AC4_SPEAKER_LW,  channel_mask);
+        AP4_Ac4SetIfChannel(nonstd_mask, 15, AP4_AC4_SPEAKER_RW,  channel_mask);
     }
     // Convert std_bed_channel_assignment_flag to channel mask (AC-4 Table 65)
     if (b_channel_assignment_flags_present) {
         AP4_UI32 std_mask = std_bed_channel_assignment_flag;
-        AP4_Ac4SetIfChannel(std_mask, 9, 0, channel_mask);   // L
-        AP4_Ac4SetIfChannel(std_mask, 9, 1, channel_mask);   // R
-        AP4_Ac4SetIfChannel(std_mask, 8, 2, channel_mask);   // C
-        AP4_Ac4SetIfChannel(std_mask, 7, 3, channel_mask);   // LFE
-        AP4_Ac4SetIfChannel(std_mask, 6, 4, channel_mask);   // Ls
-        AP4_Ac4SetIfChannel(std_mask, 6, 5, channel_mask);   // Rs
-        AP4_Ac4SetIfChannel(std_mask, 5, 6, channel_mask);   // Lb
-        AP4_Ac4SetIfChannel(std_mask, 5, 7, channel_mask);   // Rb
-        AP4_Ac4SetIfChannel(std_mask, 4, 8, channel_mask);   // Tfl
-        AP4_Ac4SetIfChannel(std_mask, 4, 9, channel_mask);   // Tfr
-        AP4_Ac4SetIfChannel(std_mask, 3, 10, channel_mask);  // Tsl
-        AP4_Ac4SetIfChannel(std_mask, 3, 11, channel_mask);  // Tsr
-        AP4_Ac4SetIfChannel(std_mask, 2, 12, channel_mask);  // Tbl
-        AP4_Ac4SetIfChannel(std_mask, 2, 13, channel_mask);  // Tbr
-        AP4_Ac4SetIfChannel(std_mask, 1, 14, channel_mask);  // Lw
-        AP4_Ac4SetIfChannel(std_mask, 1, 15, channel_mask);  // Rw
-        AP4_Ac4SetIfChannel(std_mask, 0, 16, channel_mask);  // LFE2
+        AP4_Ac4SetIfChannel(std_mask, 9, AP4_AC4_SPEAKER_L,    channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 9, AP4_AC4_SPEAKER_R,    channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 8, AP4_AC4_SPEAKER_C,    channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 7, AP4_AC4_SPEAKER_LFE,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 6, AP4_AC4_SPEAKER_LS,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 6, AP4_AC4_SPEAKER_RS,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 5, AP4_AC4_SPEAKER_LB,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 5, AP4_AC4_SPEAKER_RB,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 4, AP4_AC4_SPEAKER_TFL,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 4, AP4_AC4_SPEAKER_TFR,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 3, AP4_AC4_SPEAKER_TSL,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 3, AP4_AC4_SPEAKER_TSR,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 2, AP4_AC4_SPEAKER_TBL,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 2, AP4_AC4_SPEAKER_TBR,  channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 1, AP4_AC4_SPEAKER_LW,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 1, AP4_AC4_SPEAKER_RW,   channel_mask);
+        AP4_Ac4SetIfChannel(std_mask, 0, AP4_AC4_SPEAKER_LFE2, channel_mask);
     }
     return channel_mask;
 }
@@ -2491,24 +2582,6 @@ AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetPresentationChannelMask()
 
 AP4_Result AP4_Dac4Atom::Ac4Dsi::PresentationV1::GetChannelMaskFromChMode(unsigned int ch_mode) {
     int substreamSpeakerGroupIndexMask = AC4_SPEAKER_GROUP_INDEX_MASK_BY_CH_MODE[ch_mode];
-    if ((ch_mode >= CH_MODE_7_0_4) && (ch_mode <= CH_MODE_9_1_4)) {
-        if (!d.v1.pres_b_4_back_channels_present) {    // b_4_back_channels_present false
-            substreamSpeakerGroupIndexMask &= ~0x8;             // Remove back channels (Lb,Rb) from mask
-        }
-        if (!d.v1.pres_b_centre_present) {             // b_centre_present false
-            substreamSpeakerGroupIndexMask &= ~0x2;             // Remove centre channel (C) from mask
-        }
-        switch (d.v1.pres_top_channel_pairs) {      // top_channels_present
-            case 0:
-                substreamSpeakerGroupIndexMask &= ~0x30;        // Remove top channels (Tfl,Tfr,Tbl,Tbr) from mask
-                break;
-            case 1:
-            case 2:
-                substreamSpeakerGroupIndexMask &= ~0x30;        // Remove top channels (Tfl,Tfr,Tbl,Tbr) from mask
-                substreamSpeakerGroupIndexMask |=  0x80;        // Add top channels (Tl, Tr) from mask;
-                break;
-        }
-    }
     return substreamSpeakerGroupIndexMask;
 }
 

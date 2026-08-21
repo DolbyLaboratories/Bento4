@@ -39,10 +39,32 @@
 
 typedef enum
 {
-    immersive_audio_indicator_NONE  = -1     /**< No b_immersive_audio_indicator bit not exists */
-    ,immersive_audio_indicator_FALSE =  0     /**< No b_immersive_audio_indicator bit is not set */
-    ,immersive_audio_indicator_TRUE  =  1     /**< No b_immersive_audio_indicator bit is set */
-} AP4_immersive_audio_indicator_t;
+    DOLBY_ATMOS_INDICATOR_NONE  = -1     /**< No b_dolby_atmos_indicator bit not exists */
+    ,DOLBY_ATMOS_INDICATOR_FALSE =  0     /**< No b_dolby_atmos_indicator bit is not set */
+    ,DOLBY_ATMOS_INDICATOR_TRUE  =  1     /**< No b_dolby_atmos_indicator bit is set */
+} AP4_dolby_atmos_indicator_t;
+
+// bit position of each speaker in an AC-4 object channel mask (see AC-4 Tables 62/64/65)
+typedef enum
+{
+     AP4_AC4_SPEAKER_L    = 0   /**< Left                 */
+    ,AP4_AC4_SPEAKER_R    = 1   /**< Right                */
+    ,AP4_AC4_SPEAKER_C    = 2   /**< Center                */
+    ,AP4_AC4_SPEAKER_LFE  = 3   /**< Low Frequency Effects */
+    ,AP4_AC4_SPEAKER_LS   = 4   /**< Left Surround         */
+    ,AP4_AC4_SPEAKER_RS   = 5   /**< Right Surround        */
+    ,AP4_AC4_SPEAKER_LB   = 6   /**< Left Back             */
+    ,AP4_AC4_SPEAKER_RB   = 7   /**< Right Back            */
+    ,AP4_AC4_SPEAKER_TFL  = 8   /**< Top Front Left        */
+    ,AP4_AC4_SPEAKER_TFR  = 9   /**< Top Front Right       */
+    ,AP4_AC4_SPEAKER_TSL  = 10  /**< Top Side Left         */
+    ,AP4_AC4_SPEAKER_TSR  = 11  /**< Top Side Right        */
+    ,AP4_AC4_SPEAKER_TBL  = 12  /**< Top Back Left         */
+    ,AP4_AC4_SPEAKER_TBR  = 13  /**< Top Back Right        */
+    ,AP4_AC4_SPEAKER_LW   = 14  /**< Left Wide             */
+    ,AP4_AC4_SPEAKER_RW   = 15  /**< Right Wide            */
+    ,AP4_AC4_SPEAKER_LFE2 = 16  /**< Low Frequency Effects 2 */
+} AP4_Ac4ObjSpeakerIndex;
 
 /*----------------------------------------------------------------------
 |   AP4_Dac4Atom
@@ -88,15 +110,24 @@ public:
             AP4_UI08 n_umx_objects_minus1;
             AP4_UI08 b_substream_contains_bed_objects;
             AP4_UI08 b_substream_contains_dynamic_objects;
+            AP4_UI08 b_substream_contains_dynamic_objects_no_lfe;
             AP4_UI08 b_substream_contains_ISF_objects;
             AP4_UI08 b_ch_assign_code;
+            AP4_UI08 b_ch_assign_code_upmix;
             AP4_UI32 bed_chan_assign_code; // b_ch_assign_code
+            AP4_UI32 bed_chan_assign_code_upmix; 
             AP4_UI08 b_nonstd_bed_channel_assignment_flags_present;
+            AP4_UI08 b_nonstd_bed_channel_assignment_flags_present_upmix;
             AP4_UI08 b_channel_assignment_flags_present;
+            AP4_UI08 b_channel_assignment_flags_present_upmix;
             AP4_UI32 nonstd_bed_channel_assignment_flag; // b_nonstd_bed_channel_assignment_flags_present
+            AP4_UI32 nonstd_bed_channel_assignment_flag_upmix;
             AP4_UI32 std_bed_channel_assignment_flag; // b_channel_assignment_flags_present and !b_channel_assignment_flags_present
+            AP4_UI32 std_bed_channel_assignment_flag_upmix; // b_channel_assignment_flags_present_upmix and !b_channel_assignment_flags_present_upmix
             AP4_UI08 b_nonstd_bed_channel_assignment;
+            AP4_UI08 b_nonstd_bed_channel_assignment_upmix;
             AP4_UI32 nonstd_bed_channel_assignment; // b_nonstd_bed_channel_assignment
+            AP4_UI32 nonstd_bed_channel_assignment_upmix; // b_nonstd_bed_channel_assignment_upmix
             int ac4_substream_index;
 
             // Object parsing results from ac4_substream_info_obj
@@ -255,7 +286,7 @@ public:
                     AP4_SI32 ac4_presentation_substream_index;
                     AP4_SI32 ac4_emdf_substream_index;
                     AP4_UI32 n_substreams_in_presentation;
-                    AP4_immersive_audio_indicator_t immersive_audio_indicator_in_es;
+                    AP4_dolby_atmos_indicator_t immersive_audio_indicator_in_es;
                     AP4_UI08 b_associated;
                     AP4_UI08 b_iframe;
                     AP4_UI08 b_dei_prevent_de_processing;
@@ -274,6 +305,7 @@ public:
                                                unsigned int  &first_pres_sg_num);
             AP4_Result WritePresentationV1Dsi(AP4_BitWriter &bits);
             AP4_Result GetPresentationChMode();
+            AP4_Result GetDsiPresentationChMode();
         private:
             AP4_Result ParsePresentationVersion      (AP4_BitReader &bits, unsigned int bitstream_version);
             AP4_Result ParsePresentationConfigExtInfo(AP4_BitReader &bits, unsigned int bitstream_version);
