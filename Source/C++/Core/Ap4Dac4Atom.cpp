@@ -803,12 +803,12 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ParseSubstreamInfoObj(AP4_BitReader &bits,
                 b_ch_assign_code = bits.ReadBit();
                 if (b_ch_assign_code) {           
                     bed_chan_assign_code = bits.ReadBits(3); 
-                    if (nSignals > BedNumFromAssignCode(bed_chan_assign_code)) {
+                    unsigned int bedNum = BedNumFromAssignCode(bed_chan_assign_code);
+                    if (nSignals > bedNum) {
                         b_substream_contains_dynamic_objects |= 1;
                         b_substream_contains_dynamic_objects_no_lfe |= 1;
                     }
                     // Populate obj_type for bed channel assign code
-                    unsigned int bedNum = BedNumFromAssignCode(bed_chan_assign_code);
                     for (unsigned int i = 0; i < bedNum && n_objs < MAX_OBJ_COUNT; i++) {
                         obj_type[n_objs]        = OBJ_TYPE_BED;
                         obj_b_lfe[n_objs]       = (i == 3) ? 1 : 0;
@@ -1416,11 +1416,11 @@ AP4_Dac4Atom::Ac4Dsi::SubStream::ObjNumFromCode(unsigned char obj_code)
 {
     unsigned int obj_num = 0;
     switch (obj_code){
-        case 0: obj_num = 1 ; break;
-        case 1: obj_num = 2 ; break;
-        case 2: obj_num = 3 ; break;
-        case 3: obj_num = 4 ; break;
-        case 4: obj_num = 6 ; break;
+        case 0: obj_num = 0 ; break;
+        case 1: obj_num = 1 ; break;
+        case 2: obj_num = 2 ; break;
+        case 3: obj_num = 3 ; break;
+        case 4: obj_num = 5 ; break;
         default: obj_num = 0;
     }
     return obj_num;
