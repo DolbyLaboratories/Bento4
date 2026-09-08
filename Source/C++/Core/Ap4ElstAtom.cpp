@@ -147,13 +147,8 @@ AP4_ElstAtom::InspectFields(AP4_AtomInspector& inspector)
 {
     inspector.AddField("entry_count", m_Entries.ItemCount());
     for (AP4_Ordinal i=0; i<m_Entries.ItemCount(); i++) {
-        if (1 == m_Version) {
-            inspector.AddField("entry/segment duration", (AP4_UI64)m_Entries[i].m_SegmentDuration);
-            inspector.AddField("entry/media time", (AP4_SI64)m_Entries[i].m_MediaTime);
-        } else {
-            inspector.AddField("entry/segment duration", (AP4_UI32)m_Entries[i].m_SegmentDuration);
-            inspector.AddField("entry/media time", (AP4_SI32)m_Entries[i].m_MediaTime);
-        }
+        inspector.AddField("entry/segment duration", (AP4_UI32)m_Entries[i].m_SegmentDuration);
+        inspector.AddField("entry/media time", (AP4_SI32)m_Entries[i].m_MediaTime);
         inspector.AddField("entry/media rate", (AP4_UI16)m_Entries[i].m_MediaRate);
     }
 
@@ -170,7 +165,7 @@ AP4_ElstAtom::AddEntry(const AP4_ElstEntry& entry)
     if (entry.m_SegmentDuration > 0xFFFFFFFFUL) {
         m_Version = 1;
     }
-    if (entry.m_MediaTime > 0 && (AP4_UI64)entry.m_MediaTime > 0xFFFFFFFFUL) {
+    if (entry.m_MediaTime > 2147483647 || entry.m_MediaTime + 1 < -2147483647) {
         m_Version = 1;
     }
     

@@ -69,7 +69,7 @@ rq_payload_json = json.dumps(rq_payload)
 if options.debug:
 	print('Request Payload', rq_payload_json)
 
-sha1_hasher = hashlib.sha1()
+sha1_hasher = hashlib.sha1() # SHA1 is protocol requirement
 sha1_hasher.update(rq_payload_json.encode('ascii'))
 rq_payload_signature = aes.cbc_encrypt(sha1_hasher.digest(), bytes.fromhex(options.aes_signing_key), bytes.fromhex(options.aes_signing_iv))
 
@@ -84,7 +84,7 @@ if options.debug:
 	print(post_body)
 
 post_url = options.server_url+'/'+options.provider
-http_response = requests.post(post_url, data=json.dumps(post_body))
+http_response = requests.post(post_url, data=json.dumps(post_body), timeout=30)
 
 if options.debug:
 	print('Response:', http_response.text)

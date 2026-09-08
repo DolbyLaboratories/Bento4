@@ -94,7 +94,9 @@ public:
                  const AP4_Array<AP4_DataBuffer>& sequence_parameters,
                  AP4_UI08                         sequence_parameters_completeness,
                  const AP4_Array<AP4_DataBuffer>& picture_parameters,
-                 AP4_UI08                         picture_parameters_completeness);
+                 AP4_UI08                         picture_parameters_completeness,
+                 const AP4_Array<AP4_DataBuffer>& user_seis,
+                 AP4_DataBuffer&            three_dimension_sei);
 
     // methods
     virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);

@@ -131,6 +131,14 @@ struct AP4_AvcSequenceParameterSet {
     unsigned int frame_crop_right_offset;
     unsigned int frame_crop_top_offset;
     unsigned int frame_crop_bottom_offset;
+    unsigned int timing_info_present_flag;
+    unsigned int num_units_in_tick;
+    unsigned int time_scale;
+    unsigned int fixed_frame_rate_flag;
+    unsigned int pic_struct_present_flag;
+    unsigned int nal_hrd_parameters_present_flag;
+    unsigned int vcl_hrd_parameters_present_flag;
+    unsigned int pic_struct; // from pic_timing SEI
 };
 
 struct AP4_AvcPictureParameterSet {
@@ -302,6 +310,7 @@ private:
     AP4_AvcSequenceParameterSet* GetSliceSPS(AP4_AvcSliceHeader& sh);
     void                         CheckIfAccessUnitIsCompleted(AccessUnitInfo& access_unit_info);
     void                         AppendNalUnitData(const unsigned char* data, unsigned int data_size);
+    void                         ParseSEI(const unsigned char* data, unsigned int data_size);
     
     // members
     AP4_AvcNalParser             m_NalParser;
@@ -327,6 +336,7 @@ private:
 
     // control if the parameter sets(SPS, PPS) need to be stored in stream('mdat')
     bool                       m_keepParameterSets;
+    unsigned int                m_active_sps_id;
 };
 
 #endif // _AP4_AVC_PARSER_H_

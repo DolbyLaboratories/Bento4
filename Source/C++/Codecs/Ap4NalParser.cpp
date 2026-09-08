@@ -37,7 +37,8 @@
 +---------------------------------------------------------------------*/
 AP4_NalParser::AP4_NalParser() :
     m_State(STATE_RESET),
-    m_ZeroTrail(0)
+    m_ZeroTrail(0),
+    m_UseSavedNal(false)
 {
 }
 
@@ -208,6 +209,31 @@ AP4_NalParser::Feed(const void*            data,
         nalu = &m_Buffer;
     }
     
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_NalParser::SaveCurrentNal
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_NalParser::SaveCurrentNal()
+{
+    m_LastSavedNal.SetDataSize(m_Buffer.GetDataSize());
+    m_LastSavedNal.SetData(m_Buffer.GetData(), m_Buffer.GetDataSize());
+    m_UseSavedNal = true;
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_NalParser::PopLastNal
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_NalParser::PopLastNal(const AP4_DataBuffer*& nalu)
+{
+    if (m_UseSavedNal) {
+        nalu = &m_LastSavedNal;
+        m_UseSavedNal = false;
+    }
     return AP4_SUCCESS;
 }
 

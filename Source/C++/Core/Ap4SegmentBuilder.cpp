@@ -625,6 +625,8 @@ AP4_HevcSegmentBuilder::WriteInitSegment(AP4_ByteStream& stream)
             pps_array.Append(m_FrameParser.GetPictureParameterSets()[i]->raw_bytes);
         }
     }
+    AP4_Array<AP4_DataBuffer> user_array;
+    AP4_DataBuffer buffer(0);
 
     // setup the video the sample descripton
     AP4_UI08 parameters_completeness = (m_VideoFormat == AP4_SAMPLE_FORMAT_HVC1 ? 1 : 0);
@@ -655,7 +657,9 @@ AP4_HevcSegmentBuilder::WriteInitSegment(AP4_ByteStream& stream)
                                       sps_array,
                                       parameters_completeness,
                                       pps_array,
-                                      parameters_completeness);
+                                      parameters_completeness,
+                                      user_array,
+                                      buffer);
 
     // let the base class finish the work
     return AP4_VideoSegmentBuilder::WriteVideoInitSegment(stream,

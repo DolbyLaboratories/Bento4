@@ -40,12 +40,18 @@
 #include "Ap4AvccAtom.h"
 #include "Ap4HvccAtom.h"
 #include "Ap4Av1cAtom.h"
+#include "Ap4MdcvAtom.h"
+#include "Ap4ClliAtom.h"
+#include "Ap4ColrAtom.h"
 #include "Ap4DynamicCast.h"
-#include "Ap4Dac4Atom.h"
 #include "Ap4DmlpAtom.h"
+#include "Ap4Dac4Atom.h"
 #include "Ap4Dec3Atom.h"
 #include "Ap4Dac3Atom.h"
 #include "Ap4DvccAtom.h"
+#include "Ap4AmveAtom.h"
+#include "Ap4PaspAtom.h"
+#include "Ap4HevcParser.h"
 
 /*----------------------------------------------------------------------
 |   class references
@@ -65,11 +71,13 @@ const AP4_UI32 AP4_SAMPLE_FORMAT_AVC3 = AP4_ATOM_TYPE('a','v','c','3');
 const AP4_UI32 AP4_SAMPLE_FORMAT_AVC4 = AP4_ATOM_TYPE('a','v','c','4');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DVAV = AP4_ATOM_TYPE('d','v','a','v');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DVA1 = AP4_ATOM_TYPE('d','v','a','1');
+const AP4_UI32 AP4_SAMPLE_FORMAT_DAVC = AP4_ATOM_TYPE('d','a','v','c');
 const AP4_UI32 AP4_SAMPLE_FORMAT_HVC1 = AP4_ATOM_TYPE('h','v','c','1');
 const AP4_UI32 AP4_SAMPLE_FORMAT_HEV1 = AP4_ATOM_TYPE('h','e','v','1');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DVHE = AP4_ATOM_TYPE('d','v','h','e');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DVH1 = AP4_ATOM_TYPE('d','v','h','1');
 const AP4_UI32 AP4_SAMPLE_FORMAT_AV01 = AP4_ATOM_TYPE('a','v','0','1');
+const AP4_UI32 AP4_SAMPLE_FORMAT_DVH8 = AP4_ATOM_TYPE('d','v','h','8');
 const AP4_UI32 AP4_SAMPLE_FORMAT_ALAC = AP4_ATOM_TYPE('a','l','a','c');
 const AP4_UI32 AP4_SAMPLE_FORMAT_OWMA = AP4_ATOM_TYPE('o','w','m','a');
 const AP4_UI32 AP4_SAMPLE_FORMAT_OVC1 = AP4_ATOM_TYPE('o','v','c','1');
@@ -78,8 +86,8 @@ const AP4_UI32 AP4_SAMPLE_FORMAT_DRAC = AP4_ATOM_TYPE('d','r','a','c');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DRA1 = AP4_ATOM_TYPE('d','r','a','1');
 const AP4_UI32 AP4_SAMPLE_FORMAT_AC_3 = AP4_ATOM_TYPE('a','c','-','3');
 const AP4_UI32 AP4_SAMPLE_FORMAT_AC_4 = AP4_ATOM_TYPE('a','c','-','4');
-const AP4_UI32 AP4_SAMPLE_FORMAT_EC_3 = AP4_ATOM_TYPE('e','c','-','3');
 const AP4_UI32 AP4_SAMPLE_FORMAT_MLPA = AP4_ATOM_TYPE('m','l','p','a');
+const AP4_UI32 AP4_SAMPLE_FORMAT_EC_3 = AP4_ATOM_TYPE('e','c','-','3');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DTSC = AP4_ATOM_TYPE('d','t','s','c');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DTSH = AP4_ATOM_TYPE('d','t','s','h');
 const AP4_UI32 AP4_SAMPLE_FORMAT_DTSL = AP4_ATOM_TYPE('d','t','s','l');
@@ -108,6 +116,8 @@ const AP4_UI32 AP4_SAMPLE_FORMAT_OPUS = AP4_ATOM_TYPE('O','p','u','s');
 const AP4_UI32 AP4_SAMPLE_FORMAT_VP8  = AP4_ATOM_TYPE('v','p','0','8');
 const AP4_UI32 AP4_SAMPLE_FORMAT_VP9  = AP4_ATOM_TYPE('v','p','0','9');
 const AP4_UI32 AP4_SAMPLE_FORMAT_VP10 = AP4_ATOM_TYPE('v','p','1','0');
+
+const AP4_UI32 AP4_SAMPLE_COLOR_TYPE_NCLC = AP4_ATOM_TYPE('n','c','l','c');
 const AP4_UI32 AP4_SAMPLE_COLOR_TYPE_NCLX = AP4_ATOM_TYPE('n','c','l','x');
 
 const char*
@@ -133,7 +143,7 @@ class AP4_SampleDescription
         TYPE_AC3       = 0x07,
         TYPE_EAC3      = 0x08,
         TYPE_AC4       = 0x09,
-        TYPE_TRUEHD    = 0x0A
+        TYPE_MLP       = 0x0a,
     };
 
     // constructors & destructor
@@ -382,7 +392,9 @@ public:
                                      bool                             rpu_present_flag,
                                      bool                             el_present_flag,
                                      bool                             bl_present_flag,
-                                     AP4_UI08                         dv_bl_signal_compatibility_id);
+                                     AP4_UI08                         dv_bl_signal_compatibility_id,
+                                     AP4_UI08                         dv_md_compression,
+                                     AP4_UI16                         dv_feature_flags);
 private:
     AP4_DvccAtom* m_DvccAtom;
 };
@@ -437,7 +449,9 @@ public:
                               const AP4_Array<AP4_DataBuffer>& sequence_parameters,
                               AP4_UI08                         sequence_parameters_completeness,
                               const AP4_Array<AP4_DataBuffer>& picture_parameters,
-                              AP4_UI08                         picture_parameters_completeness);
+                              AP4_UI08                         picture_parameters_completeness,
+                              const AP4_Array<AP4_DataBuffer>& user_seis,
+                              AP4_DataBuffer&            three_dimension_sei);
  
     // accessors
     AP4_UI08 GetConfigurationVersion()             const { return m_HvccAtom->GetConfigurationVersion(); }
@@ -480,6 +494,7 @@ class AP4_HevcDoviSampleDescription : public AP4_HevcSampleDescription
 {
 public:
     AP4_HevcDoviSampleDescription(AP4_UI32                         format,
+                                  AP4_HevcFrameParser&             parser,
                                   AP4_UI16                         width,
                                   AP4_UI16                         height,
                                   AP4_UI16                         depth,
@@ -513,9 +528,32 @@ public:
                                   bool                             rpu_present_flag,
                                   bool                             el_present_flag,
                                   bool                             bl_present_flag,
-                                  AP4_UI08                         dv_bl_signal_compatibility_id);
+                                  AP4_UI08                         dv_bl_signal_compatibility_id,
+                                  AP4_UI08                         dv_md_compression,
+                                  AP4_UI16                         dv_feature_flags,
+                                  AP4_Array<AP4_HevcSEIMessage>&   sei_array,
+                                  AP4_UI16                         colour_primaries,
+                                  AP4_UI16                         transfer_characteristics,
+                                  AP4_UI16                         matrix_coeffs,
+                                  AP4_UI08                         video_full_range_flag,
+                                  AP4_UI32                         v_spacing,
+                                  AP4_UI32                         h_sapcing,
+                                  const AP4_Array<AP4_DataBuffer>& user_seis,
+                                  AP4_DataBuffer&              three_dimension_sei,
+                                  bool                             set_vexu,
+                                  AP4_UI08                         hero_eye);
 private:
+    void ConstructAtoms(AP4_Array<AP4_HevcSEIMessage>& sei_array,          
+                        AP4_UI16                         colour_primaries,
+                        AP4_UI16                         transfer_characteristics,
+                        AP4_UI16                         matrix_coeffs,
+                        AP4_UI08                         video_full_range_flag);
     AP4_DvccAtom* m_DvccAtom;
+    AP4_MdcvAtom* m_MdcvAtom;
+    AP4_ClliAtom* m_ClliAtom;
+    AP4_ColrAtom* m_ColrAtom;
+    AP4_AmveAtom* m_AmveAtom;
+    AP4_PaspAtom* m_PaspAtom;
 };
 
 /*----------------------------------------------------------------------
@@ -588,7 +626,6 @@ public:
 private:
     AP4_Av1cAtom* m_Av1cAtom;
 };
-
 
 /*----------------------------------------------------------------------
 |   AP4_MpegSampleDescription
@@ -807,30 +844,33 @@ private:
 };
 
 /*----------------------------------------------------------------------
-|   AP4_TrueHdSampleDescription
+|   AP4_MlpSampleDescription
 +---------------------------------------------------------------------*/
-class AP4_TrueHdSampleDescription : public AP4_SampleDescription,
-                                    public AP4_AudioSampleDescription
+class AP4_MlpSampleDescription : public AP4_SampleDescription,
+    public AP4_AudioSampleDescription
 {
 public:
-    AP4_IMPLEMENT_DYNAMIC_CAST_D2(AP4_TrueHdSampleDescription, AP4_SampleDescription, AP4_AudioSampleDescription)
+    AP4_IMPLEMENT_DYNAMIC_CAST_D2(AP4_MlpSampleDescription, AP4_SampleDescription, AP4_AudioSampleDescription)
 
-    // constructors
-    AP4_TrueHdSampleDescription(AP4_UI32            sample_rate,
-                                AP4_UI16            sample_size,
-                                AP4_UI16            channel_count,
-                                const AP4_DmlpAtom* dmlpAtom);
-    
-    AP4_TrueHdSampleDescription(AP4_UI32        sample_rate,
-                                AP4_UI16        sample_size,
-                                AP4_UI16        channel_count,
-                                AP4_AtomParent* details);
-        
+        // constructors
+    AP4_MlpSampleDescription(AP4_UI32            sample_rate,
+            AP4_UI16            sample_size,
+            AP4_UI16            channel_count,
+            const AP4_DmlpAtom* dmlpAtom);
+
+    AP4_MlpSampleDescription(AP4_UI32        sample_rate,
+        AP4_UI16        sample_size,
+        AP4_UI16        channel_count,
+        AP4_AtomParent* details);
+
+    AP4_MlpSampleDescription(AP4_UI32                     sample_rate,
+        AP4_UI16                     sample_size,
+        AP4_UI16                     channel_count,
+        AP4_UI32                     size, // DSI size
+        const AP4_DmlpAtom::StreamInfo* mlp_stream_info);
+
     // inherited from AP4_SampleDescription
-    virtual AP4_Result GetCodecString(AP4_String& codec) {
-        m_DmlpAtom->GetCodecString(codec);
-        return AP4_SUCCESS;
-    }
+//    virtual AP4_Result GetCodecString(AP4_String& codec) { m_DmlpAtom->GetCodecString(codec); return AP4_SUCCESS; }
     virtual AP4_Atom* ToAtom() const;
 
 private:

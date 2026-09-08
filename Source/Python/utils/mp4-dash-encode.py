@@ -1,20 +1,18 @@
 #! /usr/bin/env python3
 
 from optparse import OptionParser
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError # nosec B404
+from pipes import quote
+import shlex
 import sys
-if not sys.version_info < (3, 13):
-    from shlex import quote
-else:
-    from pipes import quote
 import os
 import os.path as path
 import json
 import math
-from mp4utils import MakeNewDir, PrintErrorAndExit
+from mp4utils import MakeNewDir, PrintErrorAndExit, BENTO4_UTILS_VERSION
 
 # setup main options
-VERSION = "1.0.0"
+VERSION = BENTO4_UTILS_VERSION
 SVN_REVISION = "$Revision: 539 $"
 SCRIPT_PATH = path.abspath(path.dirname(__file__))
 sys.path += [SCRIPT_PATH]
@@ -51,12 +49,13 @@ def compute_bitrates_and_resolutions(options):
 def run_command(options, cmd):
     if options.debug:
         print('COMMAND: ', cmd)
+    cmd_args = shlex.split(cmd) if isinstance(cmd, str) else cmd
     try:
-        return check_output(cmd, shell=True)
+        return check_output(cmd_args) # nosec B603
     except CalledProcessError as e:
         message = "binary tool failed with error %d" % e.returncode
         if options.verbose:
-            message += " - " + str(cmd)
+            message += " - " + str(cmd_args)
         raise Exception(message)
 
 class MediaSource:
@@ -196,7 +195,7 @@ def main():
 
         #x264_opts = "-x264opts keyint=%d:min-keyint=%d:scenecut=0:rc-lookahead=%d" % (options.segment_size, options.segment_size, options.segment_size)
         #video_opts = "-g %d" % (options.segment_size)
-        video_opts = '-force_key_frames "expr:eq(mod(n,%d),0)"' % (options.segment_size)
+        video_opts = "-force_key_frames 'expr:eq(mod(n,%d),0)'" % (options.segment_size)
         video_opts += " -bufsize %dk -maxrate %dk" % (bitrates[i], int(bitrates[i]*1.5))
         if options.video_codec == 'libx264':
             video_opts += " -x264opts rc-lookahead=%d" % (options.segment_size)

@@ -38,7 +38,7 @@
 #include "Ap4NalParser.h"
 #include "Ap4Array.h"
 #include "Ap4Utils.h"
-
+#include <cstdint> 
 /*----------------------------------------------------------------------
 |   constants
 +---------------------------------------------------------------------*/
@@ -96,6 +96,7 @@ const unsigned int AP4_HEVC_NALU_TYPE_UNSPEC63       = 63;
 const unsigned int AP4_HEVC_PPS_MAX_ID               = 63;
 const unsigned int AP4_HEVC_SPS_MAX_ID               = 15;
 const unsigned int AP4_HEVC_VPS_MAX_ID               = 15;
+const unsigned int AP4_HEVC_SEI_MAX_TYPE             = 202;
 const unsigned int AP4_HEVC_SPS_MAX_RPS              = 64;
 const unsigned int AP4_HEVC_MAX_LT_REFS              = 32;
 
@@ -109,6 +110,37 @@ const unsigned int AP4_HEVC_ACCESS_UNIT_FLAG_IS_SUBLAYER_NON_REF = 0x20;
 const unsigned int AP4_HEVC_SLICE_TYPE_B = 0;
 const unsigned int AP4_HEVC_SLICE_TYPE_P = 1;
 const unsigned int AP4_HEVC_SLICE_TYPE_I = 2;
+
+
+typedef enum {
+    SEI_BUFFERING_PERIOD = 0,
+    SEI_PICTURE_TIMING = 1,
+    SEI_PAN_SCAN_RECT = 2,
+    SEI_FILLER_PAYLOAD = 3,
+    SEI_USER_DATA_REGISTERED_ITU_T_T35 = 4,
+    SEI_USER_DATA_UNREGISTERED = 5,
+    SEI_RECOVERY_POINT = 6,
+    SEI_SCENE_INFO = 9,
+    SEI_FULL_FRAME_SNAPSHOT = 15,
+    SEI_PROGRESSIVE_REFINEMENT_SEGMENT_START = 16,
+    SEI_PROGRESSIVE_REFINEMENT_SEGMENT_END = 17,
+    SEI_FILM_GRAIN_CHARACTERISTICS = 19,
+    SEI_POST_FILTER_HINT = 22,
+    SEI_TONE_MAPPING_INFO = 23,
+    SEI_FRAME_PACKING = 45,
+    SEI_DISPLAY_ORIENTATION = 47,
+    SEI_SOP_DESCRIPTION = 128,
+    SEI_ACTIVE_PARAMETER_SETS = 129,
+    SEI_DECODING_UNIT_INFO = 130,
+    SEI_TEMPORAL_LEVEL0_INDEX = 131,
+    SEI_DECODED_PICTURE_HASH = 132,
+    SEI_SCALABLE_NESTING = 133,
+    SEI_REGION_REFRESH_INFO = 134,
+    SEI_MASTERING_DISPLAY_COLOR_VOLUME = 137,
+    SEI_LIGHT_LEVEL_INFORMATION = 144,
+    SEI_AMBIENT_VIEWING_ENVIRONMENT = 148,
+    SEI_3D_REFERENCE_DISPLAY = 176
+} AP4_SEI_PayloadType;
 
 /*----------------------------------------------------------------------
 |   class references
@@ -154,13 +186,28 @@ struct AP4_HevcProfileTierLevel {
 };
 
 /*----------------------------------------------------------------------
+|   AP4_SampleAspectRatio
++---------------------------------------------------------------------*/
+struct AP4_SampleAspectRatio{
+    AP4_SampleAspectRatio(unsigned int w, unsigned int h) :
+        horizontal_size(w),
+        vertical_size(h){}
+    
+    unsigned int horizontal_size;
+    unsigned int vertical_size;
+};
+
+/*----------------------------------------------------------------------
 |   AP4_HevcVuiParameters
 +---------------------------------------------------------------------*/
 struct AP4_HevcVuiParameters {
   AP4_HevcVuiParameters();
 
   // methods
-  AP4_Result Parse(AP4_BitReader& bits, unsigned int &transfer_characteristics);
+  AP4_Result Parse(AP4_BitReader& bits, unsigned int &transfer_characteristics, unsigned int sps_max_sub_layers_minus1);
+  void hrd_parameters(AP4_BitReader& bits, bool commonInfPresentFlag, uint16_t maxNumSubLayersMinus1);
+  void sub_layer_hrd_parameters(AP4_BitReader& bits, uint32_t cpb_cnt, uint8_t sub_pic_hrd_params_present_flag);
+  AP4_SampleAspectRatio GetSampleAspectRatio();
 
   unsigned int aspect_ratio_info_present_flag;
   unsigned int aspect_ratio_idc;
@@ -175,30 +222,30 @@ struct AP4_HevcVuiParameters {
   unsigned int colour_primaries;
   unsigned int transfer_characteristics;
   unsigned int matrix_coeffs;
-  //unsigned int chroma_loc_info_present_flag;
-  //unsigned int chroma_sample_loc_type_top_field;
-  //unsigned int chroma_sample_loc_type_bottom_field;
-  //unsigned int neutral_chroma_indication_flag;
-  //unsigned int field_seq_flag;
-  //unsigned int frame_field_info_present_flag;
-  //unsigned int default_display_window_flag;
-  //unsigned int def_disp_win_left_offset;
-  //unsigned int def_disp_win_right_offset;
-  //unsigned int def_disp_win_top_offset;
-  //unsigned int def_disp_win_bottom_offset;
-  //unsigned int vui_timing_info_present_flag;
-  //unsigned int vui_num_units_in_tick;
-  //unsigned int vui_time_scale;
-  //unsigned int vui_poc_proportional_to_timing_flag;
-  //unsigned int vui_num_ticks_poc_diff_one_minus1;
-  //unsigned int vui_hrd_parameters_present_flag;
+  unsigned int chroma_loc_info_present_flag;
+  unsigned int chroma_sample_loc_type_top_field;
+  unsigned int chroma_sample_loc_type_bottom_field;
+  unsigned int neutral_chroma_indication_flag;
+  unsigned int field_seq_flag;
+  unsigned int frame_field_info_present_flag;
+  unsigned int default_display_window_flag;
+  unsigned int def_disp_win_left_offset;
+  unsigned int def_disp_win_right_offset;
+  unsigned int def_disp_win_top_offset;
+  unsigned int def_disp_win_bottom_offset;
+  unsigned int vui_timing_info_present_flag;
+  unsigned int vui_num_units_in_tick;
+  unsigned int vui_time_scale;
+  unsigned int vui_poc_proportional_to_timing_flag;
+  unsigned int vui_num_ticks_poc_diff_one_minus1;
+  unsigned int vui_hrd_parameters_present_flag;
 
   //// skip hrd_parameters
-  //unsigned int bitstream_restriction_flag;
-  //unsigned int tiles_fixed_structure_flag;
-  //unsigned int motion_vectors_over_pic_boundaries_flag;
-  //unsigned int restricted_ref_pic_lists_flag;
-  //unsigned int min_spatial_segmentation_idc;
+  unsigned int bitstream_restriction_flag;
+  unsigned int tiles_fixed_structure_flag;
+  unsigned int motion_vectors_over_pic_boundaries_flag;
+  unsigned int restricted_ref_pic_lists_flag;
+  unsigned int min_spatial_segmentation_idc;
   //unsigned int max_bytes_per_pic_denom;
   //unsigned int max_bits_per_min_cu_denom;
   //unsigned int log2_max_mv_length_horizontal;
@@ -276,6 +323,7 @@ struct AP4_HevcSequenceParameterSet {
     // methods
     AP4_Result Parse(const unsigned char* data, unsigned int data_size);
     void GetInfo(unsigned int& width, unsigned int& height);
+    void GetTimeScaleInfo(unsigned int& time_scale, unsigned int& num_units);
 
     AP4_DataBuffer           raw_bytes;
     unsigned int             sps_video_parameter_set_id;
@@ -334,7 +382,7 @@ struct AP4_HevcVideoParameterSet {
     
     // methods
     AP4_Result Parse(const unsigned char* data, unsigned int data_size);
-    void GetInfo(unsigned int& time_scale, unsigned int& num_units);
+    void GetTimeScaleInfo(unsigned int& time_scale, unsigned int& num_units);
 
     AP4_DataBuffer           raw_bytes;
     unsigned int             vps_video_parameter_set_id;
@@ -353,6 +401,59 @@ struct AP4_HevcVideoParameterSet {
     unsigned int             vps_time_scale;
     unsigned int             vps_poc_proportional_to_timing_flag;
     unsigned int             vps_num_ticks_poc_diff_one_minus1;
+};
+
+/*----------------------------------------------------------------------
+|   AP4_HevcSEIMessage
++---------------------------------------------------------------------*/
+struct AP4_HevcSEIMessage {
+    AP4_HevcSEIMessage();
+    AP4_HevcSEIMessage(AP4_SEI_PayloadType payload_type);
+    AP4_HevcSEIMessage(AP4_SEI_PayloadType payload_type, AP4_Array<AP4_UI32> payloads);
+
+    // methods
+    AP4_Result Parse(const unsigned char* data, unsigned int data_size);
+    //void GetInfo(unsigned int& time_scale, unsigned int& num_units);
+
+    AP4_DataBuffer           raw_bytes;
+    AP4_SEI_PayloadType      payload_type;
+    unsigned int             payload_size;
+
+    typedef union {
+        /** payloadType === 137 */
+        /** HRD10 compatiable */
+        /** Mastering display color volume */
+        struct {
+            AP4_UI16               display_primaries_x[3];    /* indicating the Mastering primary GBR x*/
+            AP4_UI16               display_primaries_y[3];    /* indicating the Mastering primary GBR y*/
+            AP4_UI16               white_point_x;    /* indicating the Mastering White point primary x*/
+            AP4_UI16               white_point_y;    /* indicating the Mastering White point primary y*/
+            AP4_UI32               max_display_mastering_luminance;    /* indicating the Mastering Luminance Max*/
+            AP4_UI32               min_display_mastering_luminance;    /* indicating the Mastering Luminance Min*/
+        }mdcv;
+        
+        /** payloadType === 148 */
+        /** Ambient Viewing Environment */
+        struct {
+            AP4_UI32               ambient_illuminance;
+            AP4_UI16               ambient_light_x;
+            AP4_UI16               ambient_light_y;
+        }amve;
+
+        /** payloadType === 149 */
+        /** Content light level */
+        struct {
+            AP4_UI32               max_content_light_level;
+            AP4_UI32               max_pic_average_light_level;
+        }clli;
+        struct {
+            AP4_UI16   uuid_iso_iec_11578;
+            AP4_UI08* payload;
+            AP4_UI16  payload_size;
+        }udus;
+    }SeiPayload;
+
+    SeiPayload sei_payload;
 };
 
 /*----------------------------------------------------------------------
@@ -466,13 +567,17 @@ public:
                                        unsigned int                data_size,
                                        unsigned int                nal_unit_type,
                                        AP4_HevcSliceSegmentHeader& slice_header);
+    
+    bool checkIfUserSEISame(AP4_HevcSEIMessage* sei, AP4_HevcSEIMessage* pre_sei);
 
     AP4_HevcVideoParameterSet**    GetVideoParameterSets()    { return &m_VPS[0]; }
     AP4_HevcSequenceParameterSet** GetSequenceParameterSets() { return &m_SPS[0]; }
     AP4_HevcPictureParameterSet**  GetPictureParameterSets()  { return &m_PPS[0]; }
+    AP4_HevcSEIMessage*            GetSeiMessage(AP4_SEI_PayloadType payload_type);
 
     void SetParameterControl(bool isKeep) { m_keepParameterSets = isKeep; }
-    
+
+    unsigned int GetMaxTemporalId() { return m_MaxTemporalId;}
 private:
     // methods
     void CheckIfAccessUnitIsCompleted(AccessUnitInfo& access_unit_info);
@@ -483,9 +588,11 @@ private:
     AP4_HevcSliceSegmentHeader*   m_CurrentSlice;
     unsigned int                  m_CurrentNalUnitType;
     unsigned int                  m_CurrentTemporalId;
+    unsigned int                  m_MaxTemporalId;
     AP4_HevcPictureParameterSet*  m_PPS[AP4_HEVC_PPS_MAX_ID+1];
     AP4_HevcSequenceParameterSet* m_SPS[AP4_HEVC_SPS_MAX_ID+1];
     AP4_HevcVideoParameterSet*    m_VPS[AP4_HEVC_VPS_MAX_ID+1];
+    AP4_HevcSEIMessage*           m_SEI[AP4_HEVC_SEI_MAX_TYPE+1];
 
     // accumulator for NAL unit data
     unsigned int               m_TotalNalUnitCount;
@@ -493,6 +600,7 @@ private:
     AP4_Array<AP4_DataBuffer*> m_AccessUnitData;
     AP4_UI32                   m_AccessUnitFlags;
     unsigned int               m_VclNalUnitsInAccessUnit;
+    unsigned int               m_TotalSeiCount;
     
     // picture order counting
     unsigned int               m_PrevTid0Pic_PicOrderCntMsb;
@@ -500,6 +608,7 @@ private:
 
     // control if the parameter sets(VPS, SPS, PPS) need to be stored in stream('mdat')
     bool                       m_keepParameterSets;
+    bool                       m_keepUserSei;
 };
 
 #endif // _AP4_HEVC_PARSER_H_

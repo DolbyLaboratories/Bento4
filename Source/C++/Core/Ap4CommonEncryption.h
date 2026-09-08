@@ -48,7 +48,6 @@ class AP4_SaioAtom;
 class AP4_CencSampleInfoTable;
 class AP4_AvcFrameParser;
 class AP4_HevcFrameParser;
-
 /*----------------------------------------------------------------------
 |   constants
 +---------------------------------------------------------------------*/
@@ -270,7 +269,7 @@ public:
     AP4_Result Serialize(AP4_DataBuffer& buffer);
     
 private:
-    AP4_UI32                m_SampleCount; // If 0, all samples are fully encrypted, and there's a single constant IV in m_IvData
+    AP4_UI32                m_SampleCount;
     AP4_UI08                m_Flags;
     AP4_UI08                m_CryptByteBlock;
     AP4_UI08                m_SkipByteBlock;
@@ -303,7 +302,7 @@ private:
 |   | 1 byte        | 8-bit integer  | iv_size                            |
 |   +---------------+----------------+------------------------------------+
 |
-|   repeat sample_count times, or once if sample_count is 0:
+|   repeat sample_count times:
 |   +---------------+----------------+------------------------------------+
 |   | iv_size bytes | byte array     | IV[i]                              |
 |   +---------------+----------------+------------------------------------+
@@ -472,9 +471,7 @@ class AP4_CencAdvancedSubSampleMapper : public AP4_CencSubSampleMapper
 {
 public:
     // constructor and destructor
-    AP4_CencAdvancedSubSampleMapper(AP4_Size nalu_length_size, AP4_UI32 format) :
-        AP4_CencSubSampleMapper(nalu_length_size, format) {}
-    
+    AP4_CencAdvancedSubSampleMapper(AP4_Size nalu_length_size, AP4_UI32 format, AP4_TrakAtom* trak);
     // methods
     virtual AP4_Result GetSubSampleMap(AP4_DataBuffer&      sample_data,
                                        AP4_Array<AP4_UI16>& bytes_of_cleartext_data, 
@@ -495,7 +492,6 @@ public:
     virtual AP4_Result GetSubSampleMap(AP4_DataBuffer&      sample_data,
                                        AP4_Array<AP4_UI16>& bytes_of_cleartext_data, 
                                        AP4_Array<AP4_UI32>& bytes_of_encrypted_data);
-    
 private:
     // members
     AP4_AvcFrameParser*  m_AvcParser;

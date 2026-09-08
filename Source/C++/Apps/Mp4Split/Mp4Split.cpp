@@ -62,6 +62,7 @@ struct Options {
     bool         audio_only;
     bool         video_only;
     bool         init_only;
+    bool         cmaf;
 } Options;
 
 /*----------------------------------------------------------------------
@@ -87,7 +88,8 @@ PrintUsageAndExit()
             "     More than one track IDs can be specified if <track-id> is a comma-separated\n"
             "     list of track IDs\n"
             "  --audio : only output audio segments\n"
-            "  --video : only output video segments\n");
+            "  --video : only output video segments\n"
+            "  --cmaf : add CMAF compliance\n");
     exit(1);
 }
 
@@ -172,6 +174,7 @@ main(int argc, char** argv)
     Options.audio_only             = false;
     Options.video_only             = false;
     Options.init_only              = false;
+    Options.cmaf                   = false;
     
     // parse command line
     AP4_Result result;
@@ -210,6 +213,8 @@ main(int argc, char** argv)
             Options.audio_only = true;
         } else if (!strcmp(arg, "--video")) {
             Options.video_only = true;
+        } else if (!strcmp(arg, "--cmaf")) {
+            Options.cmaf = true;
         } else if (Options.input == NULL) {
             Options.input = arg;
         } else {
@@ -288,6 +293,11 @@ main(int argc, char** argv)
             }
         }
     }
+
+    AP4_CMAFHandler* cmaf_handler = NULL;
+    if (Options.cmaf) {
+        cmaf_handler = new AP4_CMAFHandler();
+    }
     
     // save the init segment
     AP4_ByteStream* output = NULL;
@@ -296,17 +306,10 @@ main(int argc, char** argv)
         fprintf(stderr, "ERROR: cannot open output file (%d)\n", result);
         return 1;
     }
-    AP4_FtypAtom* ftyp = file->GetFileType(); 
-    if (ftyp) {
-        result = ftyp->Write(*output);
-        if (AP4_FAILED(result)) {
-            fprintf(stderr, "ERROR: cannot write ftyp segment (%d)\n", result);
-            return 1;
-        }
-    }
+
     if (Options.track_id_count) {
         AP4_MoovAtom* moov = movie->GetMoovAtom();
-        
+
         // only keep the 'trak' atom that we need
         AP4_List<AP4_Atom>::Item* child = moov->GetChildren().FirstItem();
         while (child) {
@@ -339,12 +342,37 @@ main(int argc, char** argv)
             }
         }
     }
+    
+    AP4_FtypAtom* ftyp = file->GetFileType(); 
+
+    if (cmaf_handler) {
+        cmaf_handler->ApplyMoov(movie->GetMoovAtom());
+        if (ftyp) cmaf_handler->ApplyFtyp(ftyp);
+    }
+
+    if (ftyp) {
+        result = ftyp->Write(*output);
+        if (AP4_FAILED(result)) {
+            fprintf(stderr, "ERROR: cannot write ftyp segment (%d)\n", result);
+            return 1;
+        }
+    }
+
+    AP4_Atom* meta = file->GetChild(AP4_ATOM_TYPE_META);
+    if (meta != NULL) {
+        result = meta->Write(*output);
+        if (AP4_FAILED(result)) {
+            fprintf(stderr, "ERROR: cannot write META of init segment (%d)\n", result);
+            return 1;
+        }
+    }
+    
     result = movie->GetMoovAtom()->Write(*output);
     if (AP4_FAILED(result)) {
         fprintf(stderr, "ERROR: cannot write init segment (%d)\n", result);
         return 1;
     }
-        
+
     AP4_Atom* atom = NULL;
     unsigned int track_id = 0;
     AP4_DefaultAtomFactory atom_factory;
@@ -355,6 +383,7 @@ main(int argc, char** argv)
         
         if (atom->GetType() == AP4_ATOM_TYPE_MOOF) {
             AP4_ContainerAtom* moof = AP4_DYNAMIC_CAST(AP4_ContainerAtom, atom);
+            if (cmaf_handler) cmaf_handler->ApplyMoof(moof);
 
             unsigned int traf_count = 0;
             AP4_ContainerAtom* traf = NULL;

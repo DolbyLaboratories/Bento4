@@ -206,6 +206,32 @@ AP4_MvhdAtom::InspectFields(AP4_AtomInspector& inspector)
     inspector.AddField("timescale", m_TimeScale);
     inspector.AddField("duration", m_Duration);
     inspector.AddField("duration(ms)", GetDurationMs());
+    inspector.AddField("creation_time", m_CreationTime);
+    inspector.AddField("  `date -r` format", m_CreationTime - 0x7C25B080);
+    inspector.AddField("modification_time", m_ModificationTime);
+    inspector.AddField("  `date -r` format", m_ModificationTime - 0x7C25B080);
+    inspector.AddFieldF("rate", ((float)(m_Rate)) / 0x00010000);
+    inspector.AddFieldF("volume", ((float)(m_Volume)) / 0x0100);
+    float matrix[3][3];
+    for (int y = 0; y < 3; y++) {
+        for (int x = 0; x < 3; x++) {
+            matrix[x][y] = ((float)(m_Matrix[x + y * 3])) / ((x == 2) ? 0x40000000 : 0x00010000);
+        }
+    }
+    char str[32];
+    AP4_FormatString(str, sizeof(str), "| %f %f %f |", matrix[0][0], matrix[1][0], matrix[2][0]);
+    inspector.AddField("matrix(a, b, u)", str);
+    AP4_FormatString(str, sizeof(str), "| %f %f %f |", matrix[0][1], matrix[1][1], matrix[2][1]);
+    inspector.AddField("matrix(c, d, v)", str);
+    AP4_FormatString(str, sizeof(str), "| %f %f %f |", matrix[0][2], matrix[1][2], matrix[2][2]);
+    inspector.AddField("matrix(x, y, w)", str);
+    inspector.AddField("    (p q 1) * matrix", "(m n z), i.e.,:");
+    inspector.AddField("        m", "ap + cq + x");
+    inspector.AddField("        n", "bp + dq + y");
+    inspector.AddField("        z", "up + vq + w");
+    inspector.AddField("    p'", "m/z");
+    inspector.AddField("    q'", "n/z");
+    inspector.AddField("next_track_ID", m_NextTrackId);
 
     return AP4_SUCCESS;
 }

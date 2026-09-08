@@ -87,6 +87,16 @@ public:
                     AP4_Size&              bytes_consumed,
                     const AP4_DataBuffer*& nalu,
                     bool                   eos=false);
+
+    /**
+    * Save current parsed NAL
+    */
+    AP4_Result SaveCurrentNal();
+
+    /**
+    * Pop out saved NAL to prevent reading again
+    */
+    AP4_Result PopLastNal(const AP4_DataBuffer*& nalu);
     
     /**
      * Reset the state of the parser (for example, to parse a new stream).
@@ -102,7 +112,9 @@ protected:
         STATE_IN_NALU
     }              m_State;
     AP4_Cardinal   m_ZeroTrail;
+    bool           m_UseSavedNal;
     AP4_DataBuffer m_Buffer;
+    AP4_DataBuffer m_LastSavedNal;
 };
 
 #endif // _AP4_NAL_PARSER_H_

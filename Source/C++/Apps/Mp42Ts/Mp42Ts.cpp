@@ -301,10 +301,10 @@ WriteSamples(AP4_Mpeg2TsWriter&               writer,
                                                audio_track->GetSampleDescription(audio_sample.GetDescriptionIndex()), 
                                                video_track==NULL, 
                                                *output);
-            if (AP4_FAILED(result)) goto end;
+            if (AP4_FAILED(result)) return result;
             
             result = ReadSample(*audio_reader, *audio_track, audio_sample, audio_sample_data, audio_ts, audio_eos);
-            if (AP4_FAILED(result)) goto end;
+            if (AP4_FAILED(result)) return result;
             ++audio_sample_count;
         } else if (chosen_track == video_track) {
             result = video_stream->WriteSample(video_sample,
@@ -312,10 +312,10 @@ WriteSamples(AP4_Mpeg2TsWriter&               writer,
                                                video_track->GetSampleDescription(video_sample.GetDescriptionIndex()),
                                                true, 
                                                *output);
-            if (AP4_FAILED(result)) goto end;
+            if (AP4_FAILED(result)) return result;
 
             result = ReadSample(*video_reader, *video_track, video_sample, video_sample_data, video_ts, video_eos);
-            if (AP4_FAILED(result)) goto end;
+            if (AP4_FAILED(result)) return result;
             ++video_sample_count;
         } else {
             break;
@@ -347,7 +347,7 @@ WriteSamples(AP4_Mpeg2TsWriter&               writer,
     // create the playlist file if needed 
     if (Options.playlist) {
         playlist = OpenOutput(Options.playlist, 0);
-        if (playlist == NULL) goto end;
+        if (playlist == NULL) return AP4_ERROR_CANNOT_OPEN_FILE;
 
         unsigned int target_duration = 0;
         for (unsigned int i=0; i<segment_durations.ItemCount(); i++) {
@@ -499,7 +499,7 @@ main(int argc, char** argv)
         return 1;
     }
     
-	// create the input stream
+    // create the input stream
     AP4_ByteStream* input = NULL;
     result = AP4_FileByteStream::Create(Options.input, AP4_FileByteStream::STREAM_MODE_READ, input);
     if (AP4_FAILED(result)) {
@@ -507,7 +507,7 @@ main(int argc, char** argv)
         return 1;
     }
     
-	// open the file
+    // open the file
     AP4_File* input_file = new AP4_File(*input, true);
 
     // get the movie
@@ -515,8 +515,6 @@ main(int argc, char** argv)
     AP4_Movie* movie = input_file->GetMovie();
     if (movie == NULL) {
         fprintf(stderr, "ERROR: no movie in file\n");
-        delete input_file;
-        input->Release();
         return 1;
     }
 
@@ -579,9 +577,12 @@ main(int argc, char** argv)
         } else if ( sample_description->GetFormat() == AP4_SAMPLE_FORMAT_EC_3) {
             stream_type = AP4_MPEG2_STREAM_TYPE_ATSC_EAC3;
             stream_id   = AP4_MPEG2_TS_STREAM_ID_PRIVATE_STREAM_1;
+        } else if (sample_description->GetFormat() == AP4_SAMPLE_FORMAT_AC_4) {
+            stream_type = AP4_MPEG2_STREAM_TYPE_ATSC_AC4;
+            stream_id   = AP4_MPEG2_TS_STREAM_ID_PRIVATE_STREAM_1;
         } else {
             fprintf(stderr, "ERROR: audio codec not supported\n");
-            goto end;
+            return 1;
         }
 
         result = writer.SetAudioStream(audio_track->GetMediaTimeScale(),
@@ -622,7 +623,7 @@ main(int argc, char** argv)
             stream_type = AP4_MPEG2_STREAM_TYPE_HEVC;
         } else {
             fprintf(stderr, "ERROR: video codec not supported\n");
-            goto end;
+            return 1;
         }
         result = writer.SetVideoStream(video_track->GetMediaTimeScale(),
                                        stream_type,

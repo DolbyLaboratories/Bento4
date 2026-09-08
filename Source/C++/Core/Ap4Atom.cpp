@@ -626,6 +626,7 @@ AP4_AtomParent::GetChild(const AP4_UI08* uuid, AP4_Ordinal index /* = 0 */) cons
         AP4_Atom* atom = item->GetData();
         if (atom->GetType() == AP4_ATOM_TYPE_UUID) {
             AP4_UuidAtom* uuid_atom = AP4_DYNAMIC_CAST(AP4_UuidAtom, atom);
+            if (!uuid || !uuid_atom) continue;
             if (AP4_CompareMemory(uuid_atom->GetUuid(), uuid, 16) == 0) {
                 if (index == 0) return atom;
                 --index;

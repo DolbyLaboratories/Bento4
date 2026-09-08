@@ -43,6 +43,7 @@
 #include "Ap4SdpAtom.h"
 #include "Ap4MdhdAtom.h"
 #include "Ap4SyntheticSampleTable.h"
+#include "Ap4ElstAtom.h"
 
 /*----------------------------------------------------------------------
 |   AP4_Track::AP4_Track
@@ -481,8 +482,6 @@ AP4_Track::ReadSample(AP4_Ordinal     index,
 AP4_Result  
 AP4_Track::GetSampleIndexForTimeStampMs(AP4_UI32 ts_ms, AP4_Ordinal& index)
 {
-    if (m_SampleTable == NULL) return AP4_ERROR_INVALID_STATE;
-
     // convert the ts in the timescale of the track's media
     AP4_UI64 ts = AP4_ConvertTime(ts_ms, 1000, GetMediaTimeScale());
 
@@ -575,4 +574,37 @@ AP4_Track::SetTrackLanguage(const char* language)
         return mdhd->SetLanguage(language);
     }
     return AP4_ERROR_INVALID_STATE;
+}
+
+/*----------------------------------------------------------------------
+|   AP4_Track::SetEditList
++---------------------------------------------------------------------*/
+AP4_Result
+AP4_Track::SetEditList(const AP4_ContainerAtom* new_edts, AP4_UI32 edts_timescale)
+{
+    AP4_Atom* old_edts = m_TrakAtom->GetChild(AP4_ATOM_TYPE_EDTS);
+    AP4_ElstAtom* new_elst = (AP4_ElstAtom*)new_edts->GetChild(AP4_ATOM_TYPE_ELST);
+
+    if (new_elst == NULL) {
+        return AP4_ERROR_INVALID_PARAMETERS;
+    }
+
+    if (old_edts) {
+        m_TrakAtom->RemoveChild(old_edts);
+    }
+
+    m_TrakAtom->AddChild((AP4_Atom*)new_edts, 1);
+
+    // calculate the presenetation time of the track
+    AP4_UI64 duration = 0;
+    AP4_Array<AP4_ElstEntry> entries = new_elst->GetEntries();
+    for (AP4_UI32 i = 0 ; i < entries.ItemCount() ; i++) {
+        duration += entries[i].m_SegmentDuration;
+    }
+    
+    // durations of edts and tkhd are in the timescale indicated in the MovieHeaderBox
+    m_TrakAtom->SetDuration(duration);
+    m_MovieTimeScale = edts_timescale;
+    
+    return AP4_SUCCESS;
 }

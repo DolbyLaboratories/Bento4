@@ -304,15 +304,18 @@ AP4_MarlinIpmpParser::Parse(AP4_AtomParent&      top_level,
             // check that what we have parsed is indeed an 'sinf' of the right type
             if (atom->GetType() == AP4_ATOM_TYPE_SINF) {
                 AP4_ContainerAtom* sinf = AP4_DYNAMIC_CAST(AP4_ContainerAtom, atom);
-                AP4_SchmAtom* schm = AP4_DYNAMIC_CAST(AP4_SchmAtom, sinf->FindChild("schm"));
-                if ((schm->GetSchemeType()    == AP4_PROTECTION_SCHEME_TYPE_MARLIN_ACBC && 
-                     schm->GetSchemeVersion() == 0x0100) ||
-                    (schm->GetSchemeType()    == AP4_PROTECTION_SCHEME_TYPE_MARLIN_ACGK &&
-                     schm->GetSchemeVersion() == 0x0100)) {
-                    // store the sinf in the entry for that track
-                    sinf_entry->m_Sinf = sinf;
-                    break;
+                if (sinf) {
+                    AP4_SchmAtom* schm = AP4_DYNAMIC_CAST(AP4_SchmAtom, sinf->FindChild("schm"));
+                    if (schm && ((schm->GetSchemeType()    == AP4_PROTECTION_SCHEME_TYPE_MARLIN_ACBC && 
+                        schm->GetSchemeVersion() == 0x0100) ||
+                        (schm->GetSchemeType()    == AP4_PROTECTION_SCHEME_TYPE_MARLIN_ACGK &&
+                        schm->GetSchemeVersion() == 0x0100))) {
+                        // store the sinf in the entry for that track
+                        sinf_entry->m_Sinf = sinf;
+                        break;
+                    }
                 }
+                
             }
             delete atom;
         } while (AP4_SUCCEEDED(result));
@@ -1116,11 +1119,10 @@ AP4_MkidAtom::AP4_MkidAtom(AP4_Size        size,
                            AP4_ByteStream& stream) :
     AP4_Atom(AP4_ATOM_TYPE_MKID, size, version, flags)
 {
-    if (size < AP4_FULL_ATOM_HEADER_SIZE+4) return;
     AP4_Size available = size-(AP4_FULL_ATOM_HEADER_SIZE+4);
     AP4_UI32 entry_count = 0;
     stream.ReadUI32(entry_count);
-    if (available < (AP4_UI64)entry_count*(16+4)) return;
+    if (available < entry_count*(16+4)) return;
     m_Entries.SetItemCount(entry_count);
     for (unsigned int i=0; i<entry_count && available >= 16+4; i++) {
         AP4_UI32 entry_size;

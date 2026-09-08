@@ -47,14 +47,16 @@ public:
     // class methods
     static AP4_SgpdAtom* Create(AP4_Size size, AP4_ByteStream& stream);
 
-    // destructor
-    ~AP4_SgpdAtom();
-    
     // methods
+    ~AP4_SgpdAtom();
+    AP4_SgpdAtom();
     virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);
     virtual AP4_Result WriteFields(AP4_ByteStream& stream);
-
-    // accessors
+    AP4_Result AddEntry(AP4_Byte* buffer, AP4_Size buffer_size);
+    AP4_Result SetGroupType(AP4_UI32 group_type);
+    AP4_Result SetDefaultLength(AP4_UI32 default_length);
+    AP4_Result SetDefaultGroupDescriptioIndex(AP4_UI32 idx);
+    AP4_Result ResetSize();
     
 private:
     // methods
@@ -66,6 +68,7 @@ private:
     // members
     AP4_UI32                 m_GroupingType;
     AP4_UI32                 m_DefaultLength;
+    AP4_UI32                 m_DefaultGroupDescriptionIndex;
     AP4_List<AP4_DataBuffer> m_Entries;
 };
 

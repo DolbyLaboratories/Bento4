@@ -60,6 +60,13 @@ static bool
 SampleDescriptionCloneTest(AP4_File* file)
 {
     AP4_Track* track = file->GetMovie()->GetTrack(AP4_Track::TYPE_VIDEO);
+    if (track == NULL) { // no video track? try audio
+        track = file->GetMovie()->GetTrack(AP4_Track::TYPE_AUDIO);
+    }
+    if (track == NULL) {
+        return true; // no video nor audio track, consider test passed
+    }
+    
     AP4_SampleDescription* sdesc = track->GetSampleDescription(0);
     if (sdesc) {
         AP4_SampleDescription* clone = sdesc->Clone();

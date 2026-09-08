@@ -67,6 +67,10 @@ struct _Options {
     unsigned int  sequence_number_start;
     ForceSyncMode force_i_frame_sync;
     bool          no_zero_elst;
+    double        pre_roll;
+    double        post_roll;
+    bool          keep_gapless_edts;
+    bool          cmaf;
 } Options;
 
 /*----------------------------------------------------------------------
@@ -92,9 +96,16 @@ PrintUsageAndExit()
             "  --sequence-number-start <start> value of the first segment sequence number (default: 1)\n"
             "  --force-i-frame-sync <auto|all> treat all I-frames as sync samples (for open-gop sequences)\n"
             "    'auto' only forces the flag if an open-gop source is detected, 'all' forces the flag in all cases\n"
-            "  --copy-udta copy the moov/udta atom from input to output\n"
+            "  --copy-udta copy the /moov/udta and /moov/trak/udta atoms from input to output\n"
+            "  --copy-meta copy the /meta and /moov/meta atom from input to output\n"
             "  --no-zero-elst don't set the last edit list entry to 0 duration\n"
             "  --trun-version-zero set the 'trun' box version to zero (default version: 1)\n"
+            "  --dash-brand add 'dash' compatible brand in ftyp\n"
+            "  --mehd add mehd box\n"
+            "  --pre-roll <n> floating point number for the point at which the track starts playing, will overwrite the edit list\n"
+            "  --post-roll <n> floating point number for the point at which the track stops playing, will overwrite the edit list\n"
+            "  --keep-gapless-edts keep the original edit list for gapless (default = false, delete the edit list)\n"
+            "  --cmaf add CMAF compliance\n"
             );
     exit(1);
 }
@@ -210,6 +221,8 @@ public:
     AP4_UI64      m_UnscaledTimestamp;
     bool          m_Eos;
     AP4_TfraAtom* m_Tfra;
+    AP4_UI32      m_roll_duration;
+    bool          m_roll_cal;
 };
 
 /*----------------------------------------------------------------------
@@ -301,6 +314,80 @@ public:
 };
 
 /*----------------------------------------------------------------------
+|   ConvertRollEditList
++---------------------------------------------------------------------*/
+static AP4_Result
+ConvertRollEditList(AP4_UI64            duration,
+                    AP4_UI32            movie_time_scale,
+                    AP4_UI32            media_time_scale,
+                    AP4_ElstAtom*       new_elst)
+{
+    // check if there is offset
+    if (Options.pre_roll == 0 && Options.post_roll == 0) {
+        return AP4_SUCCESS;
+    }
+
+    AP4_SI64 pre = AP4_SI64(Options.pre_roll * movie_time_scale + 0.5);
+    AP4_SI64 post = AP4_SI64(Options.post_roll * movie_time_scale + 0.5);
+    AP4_UI64 media_time = 0;
+
+    if (duration < AP4_UI64(abs(post) + abs(pre))) {
+        fprintf(stderr, "ERROR: The track is too short to handle pre_roll and post_roll, duration (%llu)s\n", duration / movie_time_scale);
+        return AP4_FAILURE;
+    }
+
+    // edit list with media_time = -1 at the begining of presentation
+    if (pre < 0) {
+        AP4_ElstEntry entry = AP4_ElstEntry(-pre, -1, 1);
+        new_elst->AddEntry(entry);
+    }
+    // edit list of the track playing
+    if (pre > 0) {
+        media_time = AP4_SI64(Options.pre_roll * media_time_scale + 0.5);
+    }
+    AP4_ElstEntry entry = AP4_ElstEntry(0, media_time, 1);
+    new_elst->AddEntry(entry);
+
+    // edit list with media_time = -1 at the end of presentation
+    if (post < 0) {
+        AP4_ElstEntry entry = AP4_ElstEntry(-post, -1, 1);
+        new_elst->AddEntry(entry);
+    }
+
+    return AP4_SUCCESS;
+}
+
+/*----------------------------------------------------------------------
+|   HasPreselectionBox
++---------------------------------------------------------------------*/
+static bool
+HasPreselectionBox(const char* file)
+{
+    AP4_AtomParent top_level;
+    AP4_Atom* atom;
+    AP4_DefaultAtomFactory atom_factory;
+
+    // create the input stream
+    AP4_Result result;
+    AP4_ByteStream* input = NULL;
+    result = AP4_FileByteStream::Create(file, AP4_FileByteStream::STREAM_MODE_READ, input);
+    if (AP4_FAILED(result)) {
+        fprintf(stderr, "ERROR: cannot open input file (%s)\n", file);
+        return 1;
+    }
+
+    while (atom_factory.CreateAtomFromStream(*input, atom) == AP4_SUCCESS) {
+        top_level.AddChild(atom);
+    }
+
+    atom = top_level.FindChild("meta/grpl/prsl");
+    if (atom) {
+        return true;
+    }
+    return false;
+}
+
+/*----------------------------------------------------------------------
 |   Fragment
 +---------------------------------------------------------------------*/
 static void
@@ -311,13 +398,18 @@ Fragment(AP4_File&                input_file,
          AP4_UI32                 timescale,
          bool                     create_segment_index,
          bool                     copy_udta,
-         bool                     trun_version_one)
+         bool                     copy_meta,
+         bool                     trun_version_one,
+         bool                     has_dash_brand,
+         bool                     has_mehd)
 {
     AP4_List<FragmentInfo>       fragments;
     AP4_List<IndexedSegmentInfo> indexed_segments;
     IndexedSegmentInfo*          current_indexed_segment = NULL;
     AP4_Result                   result;
-    
+    AP4_CMAFHandler*             cmaf_handler = NULL;
+
+    // create the ftyp atom
     // get the movie
     AP4_Movie* input_movie = input_file.GetMovie();
     if (input_movie == NULL) {
@@ -337,12 +429,33 @@ Fragment(AP4_File&                input_file,
     // create an mvex container
     AP4_ContainerAtom* mvex = new AP4_ContainerAtom(AP4_ATOM_TYPE_MVEX);
     AP4_MehdAtom*      mehd = new AP4_MehdAtom(0);
-    mvex->AddChild(mehd);
-    
+    if (has_mehd) {
+        mvex->AddChild(mehd);
+    } else {
+        delete mehd;
+    }
+
     // add an output track for each track in the input file
     for (unsigned int i=0; i<cursors.ItemCount(); i++) {
         AP4_Track* track = cursors[i]->m_Track;
-        
+
+        // AC4 bitstream version validation check.
+        AP4_TrakAtom* trak = track->UseTrakAtom();
+        AP4_Dac4Atom* dac4 = AP4_DYNAMIC_CAST(AP4_Dac4Atom, trak->FindChild("mdia/minf/stbl/stsd/ac-4/dac4"));
+        if (dac4) {
+            const AP4_Byte* dac4_buffer = dac4->GetRawBytes().GetData();
+            if (dac4->GetRawBytes().GetBufferSize() < 12) { // insufficient bits to see bitstream version
+                fprintf(stderr, "ERROR: Invalid AC4specific Box size\n");
+                return;
+            }
+            AP4_BitReader bits(dac4_buffer, dac4->GetRawBytes().GetBufferSize());
+            bits.SkipBits(3);
+            AP4_UI08 bitstream_version = bits.ReadBits(7);
+            if (bitstream_version == 0) {
+                fprintf(stderr, "ERROR: AC4 bitstream version 0 is deprecated.\n");
+                return;
+            }
+        }
         result = cursors[i]->Init();
         if (AP4_FAILED(result)) {
             fprintf(stderr, "ERROR: failed to init sample cursor (%d), skipping track %d\n", result, track->GetId());
@@ -366,53 +479,101 @@ Fragment(AP4_File&                input_file,
                                                 timescale?timescale:track->GetMediaTimeScale(),
                                                 0,//track->GetMediaDuration(),
                                                 track);
-        
-        // add an edit list if needed
-        if (!trun_version_one) {
-          if (const AP4_TrakAtom* trak = track->GetTrakAtom()) {
-              AP4_ContainerAtom* edts = AP4_DYNAMIC_CAST(AP4_ContainerAtom, trak->GetChild(AP4_ATOM_TYPE_EDTS));
-              if (edts) {
-                  // create an 'edts' container
-                  AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
-                  
-                  // create a new 'edts' for each original 'edts'
-                  for (AP4_List<AP4_Atom>::Item* edts_entry = edts->GetChildren().FirstItem();
-                       edts_entry;
-                       edts_entry = edts_entry->GetNext()) {
-                      AP4_ElstAtom* elst = AP4_DYNAMIC_CAST(AP4_ElstAtom, edts_entry->GetData());
-                      AP4_ElstAtom* new_elst = new AP4_ElstAtom();
+
+        if (const AP4_TrakAtom* trak = track->GetTrakAtom()) {
+            AP4_ContainerAtom* edts = AP4_DYNAMIC_CAST(AP4_ContainerAtom, trak->GetChild(AP4_ATOM_TYPE_EDTS));
+            if (edts) {
+                // add an edit list if needed
+                if (!trun_version_one) {
+                    // create an 'edts' container
+                    AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
+                    // create a new 'edts' for each original 'edts'
+                    for (AP4_List<AP4_Atom>::Item* edts_entry = edts->GetChildren().FirstItem(); edts_entry; edts_entry = edts_entry->GetNext()) {
+                        AP4_ElstAtom* elst = AP4_DYNAMIC_CAST(AP4_ElstAtom, edts_entry->GetData());
+                        AP4_ElstAtom* new_elst = new AP4_ElstAtom();
                       
-                      // adjust the fields to match the correct timescale
-                      for (unsigned int j=0; j<elst->GetEntries().ItemCount(); j++) {
-                          AP4_ElstEntry new_elst_entry = elst->GetEntries()[j];
-                          if (j == elst->GetEntries().ItemCount() - 1 &&
-                              new_elst_entry.m_SegmentDuration == track->GetDuration() &&
-                              !Options.no_zero_elst) {
-                              // if this is the last entry, make the segment duration 0 (i.e last until the end)
-                              // in order to be compliant with the CMAF specification
-                              new_elst_entry.m_SegmentDuration = 0;
-                          } else {
-                              new_elst_entry.m_SegmentDuration = AP4_ConvertTime(new_elst_entry.m_SegmentDuration,
-                                                                                 input_movie->GetTimeScale(),
-                                                                                 AP4_FRAGMENTER_OUTPUT_MOVIE_TIMESCALE);
-                          }
-                          if (new_elst_entry.m_MediaTime > 0 && timescale) {
-                              new_elst_entry.m_MediaTime = (AP4_SI64)AP4_ConvertTime(new_elst_entry.m_MediaTime,
-                                                                                     track->GetMediaTimeScale(),
-                                                                                     timescale?timescale:track->GetMediaTimeScale());
-                                                                                 
-                          }
-                          new_elst->AddEntry(new_elst_entry);
-                      }
-                      
-                      // add the 'elst' to the 'edts' container
-                      new_edts->AddChild(new_elst);
-                  }
-                  
-                  // add the edit list to the output track (just after the 'tkhd' atom)
-                  output_track->UseTrakAtom()->AddChild(new_edts, 1);
-              }
-          }
+                        // adjust the fields to match the correct timescale
+                        for (unsigned int j=0; j<elst->GetEntries().ItemCount(); j++) {
+                            AP4_ElstEntry new_elst_entry = elst->GetEntries()[j];
+                            if (j == elst->GetEntries().ItemCount() - 1 &&
+                                new_elst_entry.m_SegmentDuration == track->GetDuration() &&
+                                !Options.no_zero_elst) {
+                                // if this is the last entry, make the segment duration 0 (i.e last until the end)
+                                // in order to be compliant with the CMAF specification
+                                new_elst_entry.m_SegmentDuration = 0;
+                            } else {
+                                new_elst_entry.m_SegmentDuration = AP4_ConvertTime(new_elst_entry.m_SegmentDuration,
+                                                                                   input_movie->GetTimeScale(),
+                                                                                   AP4_FRAGMENTER_OUTPUT_MOVIE_TIMESCALE);
+                            }
+                            if (new_elst_entry.m_MediaTime > 0 && timescale) {
+                                new_elst_entry.m_MediaTime = (AP4_SI64)AP4_ConvertTime(new_elst_entry.m_MediaTime,
+                                                                                       track->GetMediaTimeScale(),
+                                                                                       timescale?timescale:track->GetMediaTimeScale());
+                            }
+                            new_elst->AddEntry(new_elst_entry);
+                        }
+                        // add the 'elst' to the 'edts' container
+                        new_edts->AddChild(new_elst);
+                    }
+                    // add the edit list to the output track (just after the 'tkhd' atom)
+                    output_track->UseTrakAtom()->AddChild(new_edts, 1);
+                }
+                // collect gapless info if needed
+                if (Options.keep_gapless_edts) {
+                    AP4_List<AP4_Atom>::Item* edts_entry = edts->GetChildren().FirstItem();
+                    AP4_ElstAtom* elst = AP4_DYNAMIC_CAST(AP4_ElstAtom, edts_entry->GetData());
+                    AP4_UI32 movie_time_scale = input_movie->GetTimeScale();
+                    AP4_UI32 media_time_scale = track->GetMediaTimeScale();
+                    if (elst->GetEntries().ItemCount() == 1) {
+                        AP4_ElstEntry& entry_0 = elst->GetEntries()[0];
+                        Options.pre_roll = 1.0 * entry_0.m_MediaTime / media_time_scale;
+                        Options.post_roll = 1.0 * track->GetMediaDuration() / media_time_scale - 1.0 * entry_0.m_SegmentDuration /movie_time_scale - Options.pre_roll;
+                    }
+                    else if (elst->GetEntries().ItemCount() == 2) {
+                        AP4_ElstEntry& entry_0 = elst->GetEntries()[0];
+                        AP4_ElstEntry& entry_1 = elst->GetEntries()[1];
+                        if (entry_0.m_MediaTime == -1) {
+                            Options.pre_roll = -1.0 * entry_0.m_SegmentDuration / movie_time_scale;
+                            Options.post_roll = 1.0 * track->GetMediaDuration() / media_time_scale - 1.0 * entry_1.m_SegmentDuration / movie_time_scale;
+                        }
+                        else {
+                            Options.pre_roll = 1.0 * entry_0.m_MediaTime / media_time_scale;
+                            Options.post_roll = -1.0 * entry_1.m_SegmentDuration / movie_time_scale;
+                        }
+                    }
+                    else if (elst->GetEntries().ItemCount() == 3) {
+                        AP4_ElstEntry& entry_0 = elst->GetEntries()[0];
+                        AP4_ElstEntry& entry_2 = elst->GetEntries()[2];
+                        Options.pre_roll = -1.0 * entry_0.m_SegmentDuration / movie_time_scale;
+                        Options.post_roll = -1.0 * entry_2.m_SegmentDuration / movie_time_scale;
+                    }
+                    else {
+                        fprintf(stderr, "ERROR: failed to parse the edit list\n");
+                        return;
+                    }
+                }
+            }
+        }
+        if (Options.pre_roll != 0 || Options.post_roll != 0) {
+            AP4_ContainerAtom* new_edts = new AP4_ContainerAtom(AP4_ATOM_TYPE_EDTS);
+            AP4_ElstAtom* new_elst = new AP4_ElstAtom();
+            AP4_UI64 duration =  output_track->GetDuration();
+            AP4_UI32 movie_time_scale = output_movie->GetTimeScale();
+            AP4_UI32 media_time_scale = output_track->GetMediaTimeScale();
+            if (AP4_FAILED(ConvertRollEditList(duration, movie_time_scale, media_time_scale, new_elst))) {
+                return;
+            }
+            new_edts->AddChild(new_elst);
+            output_track->SetEditList(new_edts, movie_time_scale);
+        }
+
+        // copy the moov/trak/udta atom to the moov/trak container
+        if (copy_udta) {
+            AP4_Atom* udta = track->GetTrakAtom()->GetChild(AP4_ATOM_TYPE_UDTA);
+            if (udta != NULL) {
+                output_track->UseTrakAtom()->AddChild(udta->Clone());
+            }
         }
         
         // add the track to the output
@@ -425,6 +586,9 @@ Fragment(AP4_File&                input_file,
                                               0,
                                               0);
         mvex->AddChild(trex);
+    }
+    if (Options.cmaf) {
+        cmaf_handler = new AP4_CMAFHandler();
     }
     
     // select the anchor cursor
@@ -471,7 +635,9 @@ Fragment(AP4_File&                input_file,
     TrackCursor* indexed_cursor = anchor_cursor;
 
     // update the mehd duration
-    mehd->SetDuration(output_movie->GetDuration());
+    if (has_mehd) {
+        mehd->SetDuration(output_movie->GetDuration());
+    }
     
     // add the mvex container to the moov container
     output_movie->GetMoovAtom()->AddChild(mvex);
@@ -483,7 +649,15 @@ Fragment(AP4_File&                input_file,
             output_movie->GetMoovAtom()->AddChild(udta->Clone());
         }
     }
-    
+
+    // copy the moov/meta atom to the moov container
+    if (copy_meta) {
+        AP4_Atom* meta = input_movie->GetMoovAtom()->GetChild(AP4_ATOM_TYPE_META);
+        if (meta != NULL) {
+            output_movie->GetMoovAtom()->AddChild(meta->Clone());
+        }
+    }
+
     // compute all the fragments
     unsigned int sequence_number = Options.sequence_number_start;
     for(;;) {
@@ -519,6 +693,15 @@ Fragment(AP4_File&                input_file,
                 }
             }
             cursor = anchor_cursor;
+            if (cursor && Options.post_roll > 0 && !cursor->m_roll_cal) {
+                AP4_UI32 prd = Options.post_roll * cursor->m_Track->GetMediaTimeScale() + 0.5;
+                if (prd >= 2 * cursor->m_Sample.GetDuration()) {
+                    fprintf(stderr, "ERROR: Only the last access unit in an ISO BMFF Track is allowed to have a sample duration of zero, post-roll durations of two times the coded audio frame durations or more are not allowed.\n");
+                    return;
+                }
+                cursor->m_roll_duration = AP4_UI32(cursor->m_Track->GetMediaDuration() - prd);
+                cursor->m_roll_cal = true;
+            }
         }
         if (cursor == NULL) break; // all done
         
@@ -623,7 +806,7 @@ Fragment(AP4_File&                input_file,
         AP4_UI32 sync_sample_flags = 0;
         AP4_UI32 non_sync_sample_flags = 0x10000; // 0x10000 -> sample_is_non_sync
         if (cursor->m_Track->GetType() == AP4_Track::TYPE_VIDEO ||
-            (cursor->m_Track->GetSampleDescriptionCount() > 0 && cursor->m_Track->GetSampleDescription(0) &&
+            (cursor->m_Track->GetSampleDescriptionCount() > 0 &&
              cursor->m_Track->GetSampleDescription(0)->GetFormat() == AP4_SAMPLE_FORMAT_AC_4)) {
             non_sync_sample_flags |= 0x1000000; // sample_depends_on=1 (not I frame)
             sync_sample_flags     |= 0x2000000; // sample_depends_on=2 (I frame)
@@ -685,6 +868,15 @@ Fragment(AP4_File&                input_file,
                                                                timescale):
                                                next_unscaled_timestamp;
             trun_entry.sample_duration                = (AP4_UI32)(next_scaled_timestamp-cursor->m_Timestamp);
+            if (Options.post_roll > 0) {
+                if (cursor->m_roll_duration < trun_entry.sample_duration) {
+                    trun_entry.sample_duration = cursor->m_roll_duration;
+                    cursor->m_roll_duration = 0;
+                }
+                else {
+                    cursor->m_roll_duration -= trun_entry.sample_duration;
+                }
+            }
             trun_entry.sample_size                    = cursor->m_Sample.GetSize();
             trun_entry.sample_flags                   = cursor->m_Sample.IsSync() ? sync_sample_flags : non_sync_sample_flags;
             trun_entry.sample_composition_time_offset = timescale?
@@ -753,6 +945,8 @@ Fragment(AP4_File&                input_file,
             tfhd->SetDefaultSampleFlags(non_sync_sample_flags);
         } else {
             if (all_samples_are_sync) {
+                trun_flags |= AP4_TRUN_FLAG_FIRST_SAMPLE_FLAGS_PRESENT;
+                trun->SetFirstSampleFlags(sync_sample_flags);
                 tfhd_flags |= AP4_TFHD_FLAG_DEFAULT_SAMPLE_FLAGS_PRESENT;
                 tfhd->SetDefaultSampleFlags(0);
             } else {
@@ -804,6 +998,9 @@ Fragment(AP4_File&                input_file,
             compatible_brands.Append(AP4_FILE_BRAND_ISO5);
         }
 
+        if (create_segment_index && has_dash_brand) {
+            compatible_brands.Append(AP4_FILE_BRAND_DASH);
+        }
         // create a replacement
         AP4_FtypAtom* new_ftyp = new AP4_FtypAtom(ftyp->GetMajorBrand(),
                                                   ftyp->GetMinorVersion(),
@@ -817,9 +1014,24 @@ Fragment(AP4_File&                input_file,
         };
         ftyp = new AP4_FtypAtom(AP4_FTYP_BRAND_MP42, 0, &compat[0], 2);
     }
+
+    if (cmaf_handler) {
+        cmaf_handler->ApplyMoov(output_movie->GetMoovAtom());
+        cmaf_handler->ApplyFtyp(ftyp);
+    }
+
+    // write ftyp atom
     ftyp->Write(output_stream);
     delete ftyp;
-    
+
+    // write the top-level meta atom
+    if (copy_meta) {
+        AP4_Atom* input_meta = input_file.GetChild(AP4_ATOM_TYPE_META);
+        if (input_meta != NULL) {
+            input_meta->Write(output_stream);
+        }
+    }
+
     // write the moov atom
     output_movie->GetMoovAtom()->Write(output_stream);
 
@@ -849,6 +1061,9 @@ Fragment(AP4_File&                input_file,
         output_stream.Tell(fragment->m_MoofPosition);
         fragment->m_Tfra->AddEntry(fragment->m_Timestamp, fragment->m_MoofPosition);
         
+        if (cmaf_handler) {
+            cmaf_handler->ApplyMoof(fragment->m_Moof);
+        }
         // write the moof
         fragment->m_Moof->Write(output_stream);
         
@@ -987,10 +1202,10 @@ AutoDetectFragmentDuration(TrackCursor* cursor)
 }
 
 /*----------------------------------------------------------------------
-|   AutoDetectAudioFragmentDuration
+|   AutoDetectAudioVideoFragmentDuration
 +---------------------------------------------------------------------*/
 static unsigned int 
-AutoDetectAudioFragmentDuration(AP4_ByteStream& stream, TrackCursor* cursor)
+AutoDetectAudioVideoFragmentDuration(AP4_ByteStream& stream, TrackCursor* cursor)
 {
     // remember where we are in the stream
     AP4_Position where = 0;
@@ -1029,8 +1244,7 @@ AutoDetectAudioFragmentDuration(AP4_ByteStream& stream, TrackCursor* cursor)
     // don't count the last fragment if we have more than one
     if (fragment_count > 1 && last_fragment_size) {
         --fragment_count;
-    }
-    if (fragment_count <= 1 || cursor->m_Samples->GetSampleCount() < last_fragment_size) {
+    } else if (fragment_count <= 1 || cursor->m_Samples->GetSampleCount() < last_fragment_size) {
         last_fragment_size = 0;
     }
     AP4_Sample sample;
@@ -1136,7 +1350,10 @@ main(int argc, char** argv)
     bool         create_segment_index          = false;
     bool         quiet                         = false;
     bool         copy_udta                     = false;
+    bool         copy_meta                     = false;
     bool         trun_version_one              = true;
+    bool         has_dash_brand                = false;
+    bool         has_mehd                      = false;
     AP4_UI32     timescale                     = 0;
     AP4_Result   result;
 
@@ -1147,7 +1364,11 @@ main(int argc, char** argv)
     Options.tfdt_start            = 0.0;
     Options.sequence_number_start = 1;
     Options.force_i_frame_sync    = AP4_FRAGMENTER_FORCE_SYNC_MODE_NONE;
-    
+    Options.pre_roll = 0;
+    Options.post_roll = 0;
+    Options.keep_gapless_edts = false;
+    Options.cmaf = false;
+
     // parse the command line
     argv++;
     char* arg;
@@ -1163,6 +1384,10 @@ main(int argc, char** argv)
             Options.debug = true;
         } else if (!strcmp(arg, "--index")) {
             create_segment_index = true;
+        } else if (!strcmp(arg, "--dash-brand")) {
+            has_dash_brand = true;
+        } else if (!strcmp(arg, "--mehd")) {
+            has_mehd = true;
         } else if (!strcmp(arg, "--quiet")) {
             quiet = true;
         } else if (!strcmp(arg, "--trim")) {
@@ -1222,8 +1447,28 @@ main(int argc, char** argv)
             trun_version_one = false;
         } else if (!strcmp(arg, "--copy-udta")) {
             copy_udta = true;
+        } else if (!strcmp(arg, "--copy-meta")) {
+            copy_meta = true;
         } else if (!strcmp(arg, "--no-zero-elst")) {
             Options.no_zero_elst = true;
+        } else if (!strcmp(arg, "--pre-roll")) {
+            arg = *argv++;
+            if (arg == NULL) {
+                fprintf(stderr, "ERROR: missing argument after --pre-roll option\n");
+                return 1;
+            }
+            Options.pre_roll = (double)strtod(arg, &arg);
+        } else if (!strcmp(arg, "--post-roll")) {
+            arg = *argv++;
+            if (arg == NULL) {
+                fprintf(stderr, "ERROR: missing argument after --post-roll option\n");
+                return 1;
+            }
+            Options.post_roll = (double)strtod(arg, &arg);
+        } else if (!strcmp(arg, "--keep-gapless-edts")) {
+            Options.keep_gapless_edts = true;
+        } else if (!strcmp(arg, "--cmaf")) {
+            Options.cmaf = true;
         } else {
             if (input_filename == NULL) {
                 input_filename = arg;
@@ -1235,6 +1480,26 @@ main(int argc, char** argv)
             }
         }
     }
+    if ((Options.pre_roll != 0 || Options.post_roll != 0) && !trun_version_one) {
+        fprintf(stderr, "ERROR: --pre-roll & --post-roll cannot be used with --trun-version-zero\n");
+        return 1;
+    }
+    if ((Options.pre_roll != 0 || Options.post_roll != 0) && Options.keep_gapless_edts) {
+        fprintf(stderr, "ERROR: --pre-roll & --post-roll cannot be used with --keep-gapless-edts\n");
+        return 1;
+    }
+    if ((Options.pre_roll != 0 || Options.post_roll != 0 || Options.keep_gapless_edts) && Options.cmaf) {
+        fprintf(stderr, "ERROR: --pre-roll, --post-roll, or --keep-gapless-edts cannot be used with --cmaf\n");
+        return 1;
+    }
+    if (trun_version_one == false && Options.cmaf) {
+        fprintf(stderr, "ERROR: --trun-version-zero cannot be used with --cmaf\n");
+        return 1;
+    }
+    if (Options.no_zero_elst && Options.cmaf) {
+        fprintf(stderr, "ERROR: --no-zero-elst cannot be used with --cmaf\n");
+        return 1;
+    }
     if (Options.debug && Options.verbosity == 0) {
         Options.verbosity = 1;
     }
@@ -1243,6 +1508,7 @@ main(int argc, char** argv)
         fprintf(stderr, "ERROR: no input specified\n");
         return 1;
     }
+
     AP4_ByteStream* input_stream = NULL;
     result = AP4_FileByteStream::Create(input_filename, 
                                         AP4_FileByteStream::STREAM_MODE_READ, 
@@ -1263,9 +1529,15 @@ main(int argc, char** argv)
         fprintf(stderr, "ERROR: cannot create/open output (%d)\n", result);
         return 1;
     }
+
+    // if the input MP4 has preselection, set copy_meta and copy_udta to true automatically
+    if (HasPreselectionBox(input_filename)) {
+        copy_meta = true;
+        copy_udta = true;
+    }
     
     // parse the input MP4 file (moov only)
-    AP4_File input_file(*input_stream, true);
+    AP4_File input_file(*input_stream, true, copy_meta);
     
     // check the file for basic properties
     if (input_file.GetMovie() == NULL) {
@@ -1333,6 +1605,10 @@ main(int argc, char** argv)
 
     if (cursors.ItemCount() == 0) {
         fprintf(stderr, "ERROR: no valid track found\n");
+        return 1;
+    }
+    if (cursors.ItemCount() > 1 && Options.cmaf) {
+        fprintf(stderr, "--cmaf can not be applied to multi-track file\n");
         return 1;
     }
     
@@ -1447,10 +1723,18 @@ main(int argc, char** argv)
 
     // auto-detect the fragment duration if needed
     if (auto_detect_fragment_duration) {
-        if (video_track) {
-            fragment_duration = AutoDetectFragmentDuration(video_track);
-        } else if (audio_track && input_file.GetMovie()->HasFragments()) {
-            fragment_duration = AutoDetectAudioFragmentDuration(*input_stream, audio_track);
+        if (input_file.GetMovie()->HasFragments()) {
+            if (video_track) {
+              fragment_duration = AutoDetectAudioVideoFragmentDuration(*input_stream, video_track);
+            } else if (audio_track) {
+              fragment_duration = AutoDetectAudioVideoFragmentDuration(*input_stream, audio_track);
+            }
+        } else {
+            if (video_track) {
+                fragment_duration = AutoDetectFragmentDuration(video_track);
+            } else if (audio_track) {
+                fragment_duration = AutoDetectFragmentDuration(audio_track);
+            }
         }
         if (fragment_duration == 0) {
             if (Options.verbosity > 0) {
@@ -1472,7 +1756,7 @@ main(int argc, char** argv)
     } else {
         tracks_to_fragment = cursors;
     }
-    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, trun_version_one);
+    Fragment(input_file, *output_stream, tracks_to_fragment, fragment_duration, timescale, create_segment_index, copy_udta, copy_meta, trun_version_one, has_dash_brand, has_mehd);
     
     // cleanup and exit
     if (input_stream)  input_stream->Release();

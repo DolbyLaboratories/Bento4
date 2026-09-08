@@ -26,9 +26,9 @@ def GetVersion():
     lines = f.readlines()
     f.close()
     for line in lines:
-        m = re.match(r'.*AP4_VERSION_STRING *"([0-9]*)\.([0-9]*)\.([0-9]*).*"', line)
+        m = re.match(r'.*AP4_VERSION_STRING *"([0-9]*)\.([0-9]*)\.([0-9]*)\.([0-9]*).*"', line)
         if m:
-            return m.group(1) + '-' + m.group(2) + '-' + m.group(3)
+            return 'v' + m.group(1) + '.' + m.group(2) + '.' + m.group(3) + '.' + m.group(4)
     return '0-0-0'
 
 #############################################################
@@ -39,13 +39,14 @@ def GetSdkRevision():
     lines = os.popen(cmd).readlines()
     branch = ''
     suffix = ''
-    if not lines[0].startswith('## master'):
-        print('WARNING: not on master branch')
+    if not lines[0].startswith('## dolby/dev'):
+        print('WARNING: not on dolby/dev branch')
         branch = '+' + lines[0][3:].strip()
     if len(lines) > 1:
         print('WARNING: git status not empty')
         print(''.join(lines))
-        suffix = '*'
+        # remove '*' due to file naming restricts in Windows
+        # suffix = '*'
 
     cmd = 'git tag --contains HEAD'
     tags = os.popen(cmd).readlines()
@@ -154,7 +155,7 @@ if SDK_TARGET is None:
         'linux-i386'  : 'x86-unknown-linux',
         'linux-x86_64': 'x86_64-unknown-linux',
         'linux2'      : 'x86-unknown-linux',
-        'win32'       : 'x86_64-microsoft-win32',
+        'win32'       : 'x86_64-microsoft-win32-vs2015',
         'darwin'      : 'universal-apple-macosx'
     }
 
@@ -172,7 +173,7 @@ BENTO4_VERSION = GetVersion()
 SDK_REVISION = GetSdkRevision()
 if SDK_REVISION is None:
     sys.exit(1)
-SDK_NAME=f'Bento4-SDK-{BENTO4_VERSION}-{SDK_REVISION}.{SDK_TARGET}'
+SDK_NAME=f'Bento4-SDK-{BENTO4_VERSION}-{SDK_TARGET}'
 SDK_BUILD_ROOT=f'{BENTO4_HOME}/SDK'
 SDK_ROOT=f'{SDK_BUILD_ROOT}/{SDK_NAME}'
 SDK_TARGET_DIR=f'Build/Targets/{SDK_TARGET}'
@@ -180,12 +181,16 @@ SDK_TARGET_ROOT=f'{BENTO4_HOME}/{SDK_TARGET_DIR}'
 
 # Different platforms have different build dirs
 SDK_BUILD_OUTPUT_SUBDIRS = {
-    'x86_64-microsoft-win32': '/Release',
+    'x86_64-microsoft-win32-vs2015': '/x64/Release',
     'universal-apple-macosx': '/Release'
 }
 SDK_BUILD_OUTPUT_SUBDIR = SDK_BUILD_OUTPUT_SUBDIRS.get(SDK_TARGET, '')
-SDK_BUILD_OUTPUT_DIR = f'cmakebuild/{SDK_TARGET}{SDK_BUILD_OUTPUT_SUBDIR}'
-
+if platform.system() == 'Linux':
+    SDK_BUILD_OUTPUT_DIR = 'cmakebuild'
+elif sys.platform == 'darwin':
+    SDK_BUILD_OUTPUT_DIR = f'{SDK_TARGET_DIR}/Build{SDK_BUILD_OUTPUT_SUBDIR}'
+elif sys.platform == 'win32':
+    SDK_BUILD_OUTPUT_DIR = f'{SDK_TARGET_DIR}{SDK_BUILD_OUTPUT_SUBDIR}'
 print(SDK_NAME)
 
 # remove any previous SDK directory
@@ -194,24 +199,20 @@ if os.path.exists(SDK_ROOT):
 
 # copy headers, docs and utils
 misc_files = [
-    ('Source/C++/Core','*.h','include'),
-    ('Source/C++/Adapters','*.h','include'),
-    ('Source/C++/CApi','*.h','include'),
-    ('Source/C++/Codecs','*.h','include'),
-    ('Source/C++/MetaData','*.h','include'),
-    ('Source/C++/Crypto','*.h','include'),
     ('Documents','*.txt','docs'),
+    ('Documents','*.ini','docs'),
     ('Documents/Doxygen','*.chm','docs'),
     ('Documents/Doxygen','*.zip','docs'),
     ('Documents/SDK','*.doc','docs'),
     ('Documents/SDK','*.pdf','docs'),
-    ('Source/Python/utils', '*.py', 'utils')
+    ('Source/Python/utils', '*.py', 'utils'),
+    ('Source/Python/utils', 'Readme.txt', 'utils')
 ]
 CopyFiles(misc_files)
 
 if SDK_TARGET == 'universal-apple-macosx':
     script_bin_dir = 'macosx'
-elif SDK_TARGET.startswith('x86-microsoft-win32'):
+elif SDK_TARGET.startswith('x86_64-microsoft-win32'):
     script_bin_dir = 'win32'
 elif SDK_TARGET == 'x86-unknown-linux':
     script_bin_dir = 'linux-x86'
@@ -228,6 +229,7 @@ bin_files = [
     (bin_in,'mp42aac','bin'),
     (bin_in,'mp42avc','bin'),
     (bin_in,'mp42hevc','bin'),
+    (bin_in,'mp42dlb','bin'),
     (bin_in,'mp4dcfpackager','bin'),
     (bin_in,'mp4decrypt','bin'),
     (bin_in,'mp4dump','bin'),
@@ -256,12 +258,14 @@ CopyFiles(bin_files)
 if '-microsoft-' in SDK_TARGET:
     wrapper_files = [
         ('Source/Python/wrappers', 'mp4dash.bat','bin'),
+        ('Source/Python/wrappers', 'mp4dashatsc3only.bat','bin'),
         ('Source/Python/wrappers', 'mp4dashclone.bat','bin'),
         ('Source/Python/wrappers', 'mp4hls.bat','bin')
     ]
 else:
     wrapper_files = [
         ('Source/Python/wrappers', 'mp4dash','bin'),
+        ('Source/Python/wrappers', 'mp4dashatsc3only','bin'),
         ('Source/Python/wrappers', 'mp4dashclone','bin'),
         ('Source/Python/wrappers', 'mp4hls','bin')
     ]

@@ -170,6 +170,7 @@ AP4_Processor::ProcessFragments(AP4_MoovAtom*              moov,
         
         // parse the moof
         AP4_ContainerAtom* moof = AP4_DYNAMIC_CAST(AP4_ContainerAtom, atom);
+        if (!moof) return AP4_ERROR_INVALID_FORMAT;
         AP4_MovieFragment* fragment = new AP4_MovieFragment(moof);
 
         // process all the traf atoms
@@ -177,6 +178,7 @@ AP4_Processor::ProcessFragments(AP4_MoovAtom*              moov,
         AP4_Array<AP4_FragmentSampleTable*> sample_tables;
         for (;AP4_Atom* child = moof->GetChild(AP4_ATOM_TYPE_TRAF, handlers.ItemCount());) {
             AP4_ContainerAtom* traf = AP4_DYNAMIC_CAST(AP4_ContainerAtom, child);
+            if (!traf) continue;
             AP4_TfhdAtom* tfhd = AP4_DYNAMIC_CAST(AP4_TfhdAtom, traf->GetChild(AP4_ATOM_TYPE_TFHD));
             
             // find the 'trak' for this track
@@ -220,7 +222,10 @@ AP4_Processor::ProcessFragments(AP4_MoovAtom*              moov,
             AP4_Processor::FragmentHandler* handler = CreateFragmentHandler(trak, trex, traf, input, atom_offset);
             if (handler) {
                 result = handler->ProcessFragment();
-                if (AP4_FAILED(result)) return result;
+                if (AP4_FAILED(result)) {
+                    fprintf(stderr, "ProcessFragment failed\n");
+                    return result;
+                }
             }
             handlers.Append(handler);
             
@@ -276,14 +281,9 @@ AP4_Processor::ProcessFragments(AP4_MoovAtom*              moov,
                 AP4_Atom* child_atom = child_item->GetData();
                 if (child_atom->GetType() == AP4_ATOM_TYPE_TRUN) {
                     AP4_TrunAtom* trun = AP4_DYNAMIC_CAST(AP4_TrunAtom, child_atom);
-                    if (trun) {
-                        truns.Append(trun);
-                    }
+                    truns.Append(trun);
                 }
-            }
-            if (!truns.ItemCount()) {
-                continue;
-            }
+            }    
             AP4_Ordinal   trun_index        = 0;
             AP4_Ordinal   trun_sample_index = 0;
             AP4_TrunAtom* trun = truns[0];
@@ -307,7 +307,10 @@ AP4_Processor::ProcessFragments(AP4_MoovAtom*              moov,
                 // process the sample data
                 if (handler) {
                     result = handler->ProcessSample(sample_data_in, sample_data_out);
-                    if (AP4_FAILED(result)) return result;
+                    if (AP4_FAILED(result)) {
+                        fprintf(stderr, "ProcessSample failed\n");
+                        return result;
+                    }
 
                     // write the sample data
                     result = output.Write(sample_data_out.GetData(), sample_data_out.GetDataSize());

@@ -55,27 +55,29 @@ AP4_File::AP4_File(AP4_Movie* movie) :
 +---------------------------------------------------------------------*/
 AP4_File::AP4_File(AP4_ByteStream&  stream, 
                    AP4_AtomFactory& atom_factory,
-                   bool             moov_only) :
+                   bool             moov_only,
+                   bool             meta_only) :
     m_Movie(NULL),
     m_FileType(NULL),
     m_MetaData(NULL),
     m_MoovIsBeforeMdat(true)
 {
-    ParseStream(stream, atom_factory, moov_only);
+    ParseStream(stream, atom_factory, moov_only, meta_only);
 }
 
 /*----------------------------------------------------------------------
 |   AP4_File::AP4_File
 +---------------------------------------------------------------------*/
 AP4_File::AP4_File(AP4_ByteStream&  stream, 
-                   bool             moov_only) :
+                   bool             moov_only,
+                   bool             meta_only) :
     m_Movie(NULL),
     m_FileType(NULL),
     m_MetaData(NULL),
     m_MoovIsBeforeMdat(true)
 {
     AP4_DefaultAtomFactory atom_factory;
-    ParseStream(stream, atom_factory, moov_only);
+    ParseStream(stream, atom_factory, moov_only, meta_only);
 }
 
 /*----------------------------------------------------------------------
@@ -93,24 +95,39 @@ AP4_File::~AP4_File()
 void
 AP4_File::ParseStream(AP4_ByteStream&  stream,
                       AP4_AtomFactory& atom_factory,
-                      bool             moov_only)
+                      bool             moov_only, // "moov" w/ "ftyp" and "meta" only
+                      bool             meta_only)
 {
     // parse top-level atoms
     AP4_Atom*    atom;
     AP4_Position stream_position;
     bool         keep_parsing = true;
+    bool         found_meta = false;
     while (keep_parsing &&
            AP4_SUCCEEDED(stream.Tell(stream_position)) && 
            AP4_SUCCEEDED(atom_factory.CreateAtomFromStream(stream, atom))) {
-        AddChild(atom);
+        
+        if (moov_only && (atom->GetType() == AP4_ATOM_TYPE_MDAT) && (m_Movie != NULL)) {
+            keep_parsing = false; // Stop before adding MDAT, if we already have MOOV. Skips META after MDAT.
+        } else {
+            AddChild(atom);
+        }
+
         switch (atom->GetType()) {
             case AP4_ATOM_TYPE_MOOV:
                 m_Movie = new AP4_Movie(AP4_DYNAMIC_CAST(AP4_MoovAtom, atom), stream, false);
-                if (moov_only) keep_parsing = false;
+                // [cwolf] if (moov_only && found_meta) keep_parsing = false;
+                if (moov_only && (!meta_only || found_meta)) keep_parsing = false;
                 break;
 
             case AP4_ATOM_TYPE_FTYP:
                 m_FileType = AP4_DYNAMIC_CAST(AP4_FtypAtom, atom);
+                break;
+
+            case AP4_ATOM_TYPE_META:
+                found_meta = true;
+                // [cwolf] if (moov_only && (m_Movie != NULL)) keep_parsing = false;
+                if (meta_only && (!moov_only || m_Movie)) keep_parsing = false;
                 break;
 
             case AP4_ATOM_TYPE_MDAT:

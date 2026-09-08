@@ -206,6 +206,28 @@ AP4_ConvertTime(AP4_UI64 time_value,
     return ((AP4_UI64)(0.5+(double)time_value*ratio));
 }
 
+double
+AP4_NormalizeFrameRate(double frame_rate)
+{
+    if (frame_rate <= 0.0) {
+        return 0.0;
+    }
+
+    return (double)((AP4_UI32)(frame_rate * 100.0 + 0.5)) / 100.0;
+}
+
+bool
+AP4_FrameRatesDiffer(double left, double right)
+{
+    return AP4_NormalizeFrameRate(left) != AP4_NormalizeFrameRate(right);
+}
+
+AP4_UI32
+AP4_FrameRateToTimeScale(double frame_rate)
+{
+    return (AP4_UI32)(AP4_NormalizeFrameRate(frame_rate) * 1000.0 + 0.5);
+}
+
 /*----------------------------------------------------------------------
 |   AP4_FormatFourChars
 +---------------------------------------------------------------------*/
@@ -443,11 +465,6 @@ AP4_BitReader::GetBitsRead()
 AP4_BitReader::BitsWord
 AP4_BitReader::ReadCache() const
 {
-    // stop reading past the end of the buffer when more bits are requested
-    // than the input contains; the missing bytes read as zero
-    if (m_Position+AP4_WORD_BYTES > m_Buffer.GetBufferSize()) {
-        return 0;
-    }
     const AP4_UI08* out_ptr = m_Buffer.GetData()+m_Position;
     return (((AP4_BitReader::BitsWord) out_ptr[0]) << 24) |
            (((AP4_BitReader::BitsWord) out_ptr[1]) << 16) |
@@ -523,7 +540,11 @@ AP4_BitReader::PeekBits(unsigned int n)
       /* combine the new word and the cache, and update the state */
       AP4_BitReader::BitsWord   cache = m_Cache & AP4_BIT_MASK(m_BitsCached);
       n -= m_BitsCached;
-      return (word >> (AP4_WORD_BITS - n)) | (cache << n);
+      if (n >= AP4_WORD_BITS) {
+          return word >> (AP4_WORD_BITS - n);
+      } else {
+          return (word >> (AP4_WORD_BITS - n)) | (cache << n);
+      }
    }
 }
 
@@ -595,4 +616,39 @@ AP4_BitReader::GetBitsPosition()
     return m_Position * 8 - m_BitsCached;
 }
 
+AP4_UI32 AP4_BitReader::ReadBytesLE(unsigned n_bytes) {
+    unsigned need_bits = n_bytes * 8;
+    unsigned have_bits = 8 * m_Buffer.GetDataSize() - GetBitsPosition();
+    if (have_bits < need_bits) {
+        n_bytes = have_bits / 8;
+    }
 
+    AP4_UI32 v = 0;
+    for (unsigned i = 0; i < n_bytes; ++i) {
+        AP4_UI32 b = ReadBits(8);
+        v |= (b & 0xFFu) << (8 * i);               
+    }
+    return v;
+}
+
+void AP4_BitReader::PrintBytes(unsigned n_bytes) {
+    unsigned pos = m_Position;
+    unsigned bits = m_BitsCached;
+    AP4_BitReader::BitsWord cache = m_Cache;
+
+    for (unsigned i = 0; i < n_bytes; i++) {
+        AP4_UI32 b = ReadBits(8);
+        printf("%02X ", b);
+    }
+    printf("\n");
+
+    m_Position = pos;
+    m_BitsCached = bits;
+    m_Cache = cache;
+}
+
+void AP4_BitReader::ByteAlign() {
+    if (GetBitsPosition() % 8) {
+        SkipBits(8 - (GetBitsPosition() % 8));
+    }
+}

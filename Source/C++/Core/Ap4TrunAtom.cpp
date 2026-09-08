@@ -38,11 +38,6 @@
 AP4_DEFINE_DYNAMIC_CAST_ANCHOR(AP4_TrunAtom)
 
 /*----------------------------------------------------------------------
-|   constants
-+---------------------------------------------------------------------*/
-#define AP4_TRUN_MAX_SAMPLE_COUNT 0xFFFFFF
-
-/*----------------------------------------------------------------------
 |   AP4_TrunAtom::Create
 +---------------------------------------------------------------------*/
 AP4_TrunAtom*
@@ -106,100 +101,52 @@ AP4_TrunAtom::AP4_TrunAtom(AP4_UI32        size,
                            AP4_ByteStream& stream) :
     AP4_Atom(AP4_ATOM_TYPE_TRUN, size, version, flags)
 {
-    if (size < AP4_FULL_ATOM_HEADER_SIZE + 4) {
-        return;
-    }
     AP4_UI32 sample_count = 0;
     stream.ReadUI32(sample_count);
-    AP4_Size bytes_left = size - AP4_FULL_ATOM_HEADER_SIZE - 4;
 
     // read optional fields
     int optional_fields_count = (int)ComputeOptionalFieldsCount(flags);
     if (flags & AP4_TRUN_FLAG_DATA_OFFSET_PRESENT) {
         AP4_UI32 offset = 0;
-        if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(offset))) {
-            return;
-        }
+        stream.ReadUI32(offset);
         m_DataOffset = (AP4_SI32)offset;
-        if (optional_fields_count == 0) {
-            return;
-        }
         --optional_fields_count;
-        bytes_left -= 4;
     }
     if (flags & AP4_TRUN_FLAG_FIRST_SAMPLE_FLAGS_PRESENT) {
-        if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(m_FirstSampleFlags))) {
-            return;
-        }
-        if (optional_fields_count == 0) {
-            return;
-        }
+        stream.ReadUI32(m_FirstSampleFlags);
         --optional_fields_count;
-        bytes_left -= 4;
     }
     
     // discard unknown optional fields 
     for (int i=0; i<optional_fields_count; i++) {
         AP4_UI32 discard;
-        if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(discard))) {
-            return;
-        }
-        bytes_left -= 4;
+        stream.ReadUI32(discard);
     }
     
     int record_fields_count = (int)ComputeRecordFieldsCount(flags);
-    if (record_fields_count) {
-        if ((bytes_left / (record_fields_count*4)) < sample_count) {
-            // not enough data for all samples, the format is invalid
-            return;
-        }
-    } else {
-        if (sample_count > AP4_TRUN_MAX_SAMPLE_COUNT) {
-            return;
-        }
-    }
-
-    if (AP4_FAILED(m_Entries.SetItemCount(sample_count))) {
-        return;
-    }
-        
+    m_Entries.SetItemCount(sample_count);
     for (unsigned int i=0; i<sample_count; i++) {
         if (flags & AP4_TRUN_FLAG_SAMPLE_DURATION_PRESENT) {
-            if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(m_Entries[i].sample_duration))) {
-                return;;
-            }
+            stream.ReadUI32(m_Entries[i].sample_duration);
             --record_fields_count;
-            bytes_left -= 4;
         }
         if (flags & AP4_TRUN_FLAG_SAMPLE_SIZE_PRESENT) {
-            if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(m_Entries[i].sample_size))) {
-                return;
-            }
+            stream.ReadUI32(m_Entries[i].sample_size);
             --record_fields_count;
-            bytes_left -= 4;
         }
         if (flags & AP4_TRUN_FLAG_SAMPLE_FLAGS_PRESENT) {
-            if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(m_Entries[i].sample_flags))) {
-                return;
-            }
+            stream.ReadUI32(m_Entries[i].sample_flags);
             --record_fields_count;
-            bytes_left -= 4;
         }
         if (flags & AP4_TRUN_FLAG_SAMPLE_COMPOSITION_TIME_OFFSET_PRESENT) {
-            if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(m_Entries[i].sample_composition_time_offset))) {
-                return;
-            }
+            stream.ReadUI32(m_Entries[i].sample_composition_time_offset);
             --record_fields_count;
-            bytes_left -= 4;
         }
     
         // skip unknown fields 
         for (int j=0;j<record_fields_count; j++) {
             AP4_UI32 discard;
-            if (bytes_left < 4 || AP4_FAILED(stream.ReadUI32(discard))) {
-                return;
-            }
-            bytes_left -= 4;
+            stream.ReadUI32(discard);
         }
     }
 }
@@ -314,9 +261,7 @@ AP4_TrunAtom::InspectFields(AP4_AtomInspector& inspector)
             }
             if (m_Flags & AP4_TRUN_FLAG_SAMPLE_COMPOSITION_TIME_OFFSET_PRESENT) {
                 inspector.AddField(inspector.GetVerbosity() >= 2 ? "sample_composition_time_offset" : "c",
-                                   m_Version == 0 ?
-                                   m_Entries[i].sample_composition_time_offset :
-                                   static_cast<AP4_UI64>(static_cast<AP4_SI32>(m_Entries[i].sample_composition_time_offset)));
+                                   m_Entries[i].sample_composition_time_offset);
             }
 
             inspector.EndObject();

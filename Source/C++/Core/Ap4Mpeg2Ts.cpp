@@ -73,9 +73,9 @@ static unsigned char const StuffingBytes[AP4_MPEG2TS_PACKET_SIZE] =
     0xFF, 0xFF, 0xFF, 0xFF
 };
 
-const unsigned int AP4_HEVC_NALU_TYPE_VPS_NUT        = 32;
-const unsigned int AP4_HEVC_NALU_TYPE_SPS_NUT        = 33;
-const unsigned int AP4_HEVC_NALU_TYPE_PPS_NUT        = 34;
+// const unsigned int AP4_HEVC_NALU_TYPE_VPS_NUT        = 32;
+// const unsigned int AP4_HEVC_NALU_TYPE_SPS_NUT        = 33;
+// const unsigned int AP4_HEVC_NALU_TYPE_PPS_NUT        = 34;
 
 /*----------------------------------------------------------------------
 |   GetSamplingFrequencyIndex

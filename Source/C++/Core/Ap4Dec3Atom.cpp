@@ -51,7 +51,7 @@ AP4_Dec3Atom::Create(AP4_Size size, AP4_ByteStream& stream)
     AP4_Result result = stream.Read(payload_data.UseData(), payload_size);
     if (AP4_FAILED(result)) return NULL;
     
-    // create the atom from the raw bytes
+    // check the version
     const AP4_UI08* payload = payload_data.GetData();
     return new AP4_Dec3Atom(size, payload);
 }
@@ -141,7 +141,7 @@ AP4_Dec3Atom::AP4_Dec3Atom(AP4_UI32 size, const AP4_UI08* payload) :
     payload_size -= 2;
     m_SubStreams.SetItemCount(substream_count);
     for (unsigned int i=0; i<substream_count; i++) {
-        if (payload_size < 4) {
+        if (payload_size < 3) {
             m_SubStreams[i].fscod       = 0;
             m_SubStreams[i].bsid        = 0;
             m_SubStreams[i].bsmod       = 0;

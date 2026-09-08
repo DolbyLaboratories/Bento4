@@ -313,7 +313,8 @@ AP4_OmaDcfAtomDecrypter::CreateDecryptingStream(
 
     // we don't keep our own reference to the sub stream
     sub_stream->Release();
-    
+    delete sub_stream;
+
     return result;
 }
 

@@ -164,6 +164,9 @@ AP4_UI32 AP4_DurationMsFromUnits(AP4_UI64 units,
 AP4_UI64 AP4_ConvertTime(AP4_UI64 time_value,
                          AP4_UI32 from_time_scale,
                          AP4_UI32 to_time_scale);
+double AP4_NormalizeFrameRate(double frame_rate);
+bool AP4_FrameRatesDiffer(double left, double right);
+AP4_UI32 AP4_FrameRateToTimeScale(double frame_rate);
 
 /*----------------------------------------------------------------------
 |   random numbers
@@ -262,10 +265,17 @@ public:
     AP4_Result   SkipBytes(AP4_Size byte_count);
     void         SkipBit();
     void         SkipBits(unsigned int bit_count);
-
+    AP4_UI32     ReadBytesLE(unsigned n_bytes);
+    void PrintBytes(AP4_Size byte_count);
     unsigned int GetBitsPosition();
 
     unsigned int GetBitsRead();
+    void ByteAlign();
+    unsigned int GetBitsAvailable() {
+        unsigned int total_bits = 8 * m_Buffer.GetDataSize();
+        unsigned int bits_read = GetBitsPosition();
+        return (bits_read < total_bits) ? (total_bits - bits_read) : 0;
+    }
 
 private:
     // methods

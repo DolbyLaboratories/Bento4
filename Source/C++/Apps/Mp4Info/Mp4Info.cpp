@@ -299,13 +299,17 @@ ShowMpegAudioSampleDescription(AP4_MpegAudioSampleDescription& mpeg_audio_desc)
     AP4_MpegAudioSampleDescription::Mpeg4AudioObjectType object_type = 
         mpeg_audio_desc.GetMpeg4AudioObjectType();
     const char* object_type_string = AP4_MpegAudioSampleDescription::GetMpeg4AudioObjectTypeString(object_type);
+    AP4_String codec_string;
+    mpeg_audio_desc.GetCodecString(codec_string);
     
     switch (Options.format) {
         case TEXT_FORMAT:
+            printf("    Codecs String: %s\n", codec_string.GetChars());
             printf("    MPEG-4 Audio Object Type: %d (%s)\n", object_type, object_type_string);
             break;
 
         case JSON_FORMAT:
+            printf("\"codecs_string\": \"%s\",\n", codec_string.GetChars());
             printf("\"mpeg_4_audio_object_type\":%d,\n",          object_type);
             printf("\"mpeg_4_audio_object_type_name\":\"%s\"", object_type_string);
             break;
@@ -384,17 +388,18 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
     
     char coding[5];
     AP4_FormatFourChars(coding, desc->GetFormat());
-    printf(    "    Coding:       %s", coding);
+    printf(    "    Coding:      %s", coding);
     const char* format_name = AP4_GetFormatName(desc->GetFormat());
     if (format_name) {
         printf(" (%s)\n", format_name);
     } else {
         printf("\n");
     }
+
     AP4_String codec;
     desc->GetCodecString(codec);
-    printf(    "    Codec String: %s\n", codec.GetChars());
-    
+    printf("    Codec String: %s\n", codec.GetChars());
+
     switch (desc->GetType()) {
       case AP4_SampleDescription::TYPE_MPEG: {
         // MPEG sample description
@@ -405,50 +410,52 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
         printf("    Max Bitrate: %d\n", mpeg_desc->GetMaxBitrate());
         printf("    Avg Bitrate: %d\n", mpeg_desc->GetAvgBitrate());
         printf("    Buffer Size: %d\n", mpeg_desc->GetBufferSize());
-        
-        if (mpeg_desc->GetObjectTypeId() == AP4_OTI_MPEG4_AUDIO          ||
-            mpeg_desc->GetObjectTypeId() == AP4_OTI_MPEG2_AAC_AUDIO_LC   ||
+
+        if (mpeg_desc->GetObjectTypeId() == AP4_OTI_MPEG4_AUDIO ||
+            mpeg_desc->GetObjectTypeId() == AP4_OTI_MPEG2_AAC_AUDIO_LC ||
             mpeg_desc->GetObjectTypeId() == AP4_OTI_MPEG2_AAC_AUDIO_MAIN) {
-            AP4_MpegAudioSampleDescription* mpeg_audio_desc = AP4_DYNAMIC_CAST(AP4_MpegAudioSampleDescription, mpeg_desc);
-            if (mpeg_audio_desc) ShowMpegAudioSampleDescription(*mpeg_audio_desc);
+          AP4_MpegAudioSampleDescription* mpeg_audio_desc = AP4_DYNAMIC_CAST(AP4_MpegAudioSampleDescription, mpeg_desc);
+          if (mpeg_audio_desc) ShowMpegAudioSampleDescription(*mpeg_audio_desc);
         }
-        break;
+		break;
       }
 
       case AP4_SampleDescription::TYPE_AVC: {
-        // AVC specifics
+        // AVC Sample Description
         AP4_AvcSampleDescription* avc_desc = AP4_DYNAMIC_CAST(AP4_AvcSampleDescription, desc);
         const char* profile_name = AP4_AvccAtom::GetProfileName(avc_desc->GetProfile());
         printf("    AVC Profile:          %d", avc_desc->GetProfile());
         if (profile_name) {
-            printf(" (%s)\n", profile_name);
-        } else {
-            printf("\n");
+          printf(" (%s)\n", profile_name);
+        }
+        else {
+          printf("\n");
         }
         printf("    AVC Profile Compat:   %x\n", avc_desc->GetProfileCompatibility());
         printf("    AVC Level:            %d\n", avc_desc->GetLevel());
         printf("    AVC NALU Length Size: %d\n", avc_desc->GetNaluLengthSize());
         printf("    AVC SPS: [");
         const char* sep = "";
-        for (unsigned int i=0; i<avc_desc->GetSequenceParameters().ItemCount(); i++) {
-            printf("%s", sep);
-            ShowData(avc_desc->GetSequenceParameters()[i]);
-            sep = ", ";
+        for (unsigned int i = 0; i<avc_desc->GetSequenceParameters().ItemCount(); i++) {
+          printf("%s", sep);
+          ShowData(avc_desc->GetSequenceParameters()[i]);
+          sep = ", ";
         }
         printf("]\n");
         printf("    AVC PPS: [");
         sep = "";
-        for (unsigned int i=0; i<avc_desc->GetPictureParameters().ItemCount(); i++) {
-            printf("%s", sep);
-            ShowData(avc_desc->GetPictureParameters()[i]);
-            sep = ", ";
+        for (unsigned int i = 0; i<avc_desc->GetPictureParameters().ItemCount(); i++) {
+          printf("%s", sep);
+          ShowData(avc_desc->GetPictureParameters()[i]);
+          sep = ", ";
         }
         printf("]\n");
-        break;
+        avc_desc->GetCodecString(codec);
+		break;
       }
 
       case AP4_SampleDescription::TYPE_HEVC: {
-        // HEVC specifics
+        // HEVC Sample Description
         AP4_HevcSampleDescription* hevc_desc = AP4_DYNAMIC_CAST(AP4_HevcSampleDescription, desc);
         const char* profile_name = AP4_HvccAtom::GetProfileName(hevc_desc->GetGeneralProfileSpace(), hevc_desc->GetGeneralProfile());
         printf("    HEVC Profile Space:       %d\n", hevc_desc->GetGeneralProfileSpace());
@@ -456,7 +463,7 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
         if (profile_name) printf(" (%s)", profile_name);
         printf("\n");
         printf("    HEVC Profile Compat:      %x\n", hevc_desc->GetGeneralProfileCompatibilityFlags());
-        printf("    HEVC Level:               %d.%d\n", hevc_desc->GetGeneralLevel()/30, (hevc_desc->GetGeneralLevel()%30)/3);
+        printf("    HEVC Level:               %d.%d\n", hevc_desc->GetGeneralLevel() / 30, (hevc_desc->GetGeneralLevel() % 30) / 3);
         printf("    HEVC Tier:                %d\n", hevc_desc->GetGeneralTierFlag());
         printf("    HEVC Chroma Format:       %d", hevc_desc->GetChromaFormat());
         const char* chroma_format_name = AP4_HvccAtom::GetChromaFormatName(hevc_desc->GetChromaFormat());
@@ -468,24 +475,25 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
         printf("    HEVC Constant Frame Rate: %d\n", hevc_desc->GetConstantFrameRate());
         printf("    HEVC NALU Length Size:    %d\n", hevc_desc->GetNaluLengthSize());
         printf("    HEVC Sequences:\n");
-        for (unsigned int i=0; i<hevc_desc->GetSequences().ItemCount(); i++) {
-            const AP4_HvccAtom::Sequence& seq = hevc_desc->GetSequences()[i];
-            printf("      {\n");
-            printf("        Array Completeness=%d\n", seq.m_ArrayCompleteness);
-            printf("        Type=%d", seq.m_NaluType);
-            const char* nalu_type_name = AP4_HevcNalParser::NaluTypeName(seq.m_NaluType);
-            if (nalu_type_name) {
-                printf(" (%s)", nalu_type_name);
-            }
-            printf("\n");
-            const char* sep = "";
-            for (unsigned int j=0; j<seq.m_Nalus.ItemCount(); j++) {
-                printf("%s        ", sep);
-                ShowData(seq.m_Nalus[j]);
-                sep = "\n";
-            }
-            printf("\n      }\n");
+        for (unsigned int i = 0; i<hevc_desc->GetSequences().ItemCount(); i++) {
+          const AP4_HvccAtom::Sequence& seq = hevc_desc->GetSequences()[i];
+          printf("      {\n");
+          printf("        Array Completeness=%d\n", seq.m_ArrayCompleteness);
+          printf("        Type=%d", seq.m_NaluType);
+          const char* nalu_type_name = AP4_HevcNalParser::NaluTypeName(seq.m_NaluType);
+          if (nalu_type_name) {
+            printf(" (%s)", nalu_type_name);
+          }
+          printf("\n");
+          const char* sep = "";
+          for (unsigned int j = 0; j<seq.m_Nalus.ItemCount(); j++) {
+            printf("%s        ", sep);
+            ShowData(seq.m_Nalus[j]);
+            sep = "\n";
+          }
+          printf("\n      }\n");
         }
+        hevc_desc->GetCodecString(codec);
         break;
       }
 
@@ -624,7 +632,8 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
                         if (presentation.d.v1.b_multi_pid == 0) { self_contained ++; }
                         if (presentation.d.v1.b_presentation_channel_coded == 1) {
                             AP4_FormatString(presentation_type, sizeof(presentation_type), "Channel based");
-                            if (presentation.d.v1.dsi_presentation_ch_mode >= 11 && presentation.d.v1.dsi_presentation_ch_mode <= 15) {
+                            if (presentation.d.v1.dsi_presentation_ch_mode == 15 ||
+                                (presentation.d.v1.dsi_presentation_ch_mode >= 11 && presentation.d.v1.dsi_presentation_ch_mode <= 14 && presentation.d.v1.pres_top_channel_pairs > 0)) {
                                 AP4_FormatString(presentation_type, sizeof(presentation_type), "Channel based immsersive");
                             }
                         } else {
@@ -635,34 +644,39 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
                         }else {
                             printf("        Stream Type = %s\n", presentation_type);
                         }
-                        printf("        presentation_id = %d\n", presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1);
+                        AP4_SI32 presentation_id = 0;
+                        presentation_id = presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1;
+                        presentation_id = presentation.d.v1.b_extended_presentation_id? presentation.d.v1.extended_presentation_id : presentation_id;
+                        printf("        presentation_id = %d\n", presentation_id);
                         printf("        Codec String = %s\n", presentation_codec);
                         printf("        presentation_channel_mask_v1 = 0x%x\n", presentation.d.v1.presentation_channel_mask_v1);
-                        printf("        Dolby Atmos source = %s\n", presentation.d.v1.dolby_atmos_indicator? "Yes": "No");
+                        printf("        Dolby Atmos source = %s\n", presentation.d.v1.immersive_audio_indicator? "Yes": "No");
                         printf("        Language = %s\n", presentation_lang);
                         printf("        Self Contained = %s\n", presentation.d.v1.b_multi_pid? "No": "Yes");
                     }
                 }
+                printf("    Self Contained: %s\n", (self_contained == dsi.d.v1.n_presentations) ? "Yes": ((self_contained == 0)? "No": "Part"));
             }
             
-            printf("    Self Contained: %s\n", (self_contained == dsi.d.v1.n_presentations) ? "Yes": ((self_contained == 0)? "No": "Part"));
+            //printf("    Self Contained: %s\n", (self_contained == dsi.d.v1.n_presentations) ? "Yes": ((self_contained == 0)? "No": "Part"));
             printf("    AC-4 dac4 payload: [");
             ShowData(dac4->GetRawBytes());
             printf("]\n");
         }
         break;
       }
-
       case AP4_SAMPLE_FORMAT_MLPA: {
-        // Dolby TrueHD specifics
-        AP4_DmlpAtom* dmlp = AP4_DYNAMIC_CAST(AP4_DmlpAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DMLP));
-        if (dmlp) {
-            printf("    Format Info:    %d\n", dmlp->m_FormatInfo);
-            printf("    Peak Data Rate: %d\n", dmlp->m_PeakDataRate);
-        }
+          AP4_DmlpAtom* dmlp = AP4_DYNAMIC_CAST(AP4_DmlpAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DMLP));
+          if (dmlp) {
+              printf("    Dolby TrueHD Stream:\n");
+              printf("        format_info           = %d\n", dmlp->GetStreamInfo().format_info);
+              printf("        peak_data_rate        = %d\n", dmlp->GetStreamInfo().peak_data_rate);
+              printf("    TrueHD dmlp payload: [");
+              ShowData(dmlp->GetRawBytes());
+              printf("]\n");
+          }
         break;
       }
-        
       // VPx Specifics
       case AP4_SAMPLE_FORMAT_VP8:
       case AP4_SAMPLE_FORMAT_VP9:
@@ -682,9 +696,50 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
       }
     }
     
+
     // Dolby Vision specifics
     AP4_DvccAtom* dvcc = AP4_DYNAMIC_CAST(AP4_DvccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DVCC));
+    if(!dvcc) {
+        dvcc = AP4_DYNAMIC_CAST(AP4_DvccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DVVC));
+    }
     if (dvcc) {
+        /* Codec String */
+        char workspace[64];
+        char coding[5];
+        strncpy(coding, codec.GetChars(), 4);
+        coding[4] = '\0';
+        /* Non back-compatible */
+        if (strcmp(coding, "dvav") == 0 || strcmp(coding, "dva1") == 0 ||
+            strcmp(coding, "dvhe") == 0 || strcmp(coding, "dvh1") == 0){
+            AP4_FormatString(workspace,
+                            sizeof(workspace),
+                            "%s.%02d.%02d",
+                            coding,
+                            dvcc->GetDvProfile(),
+                            dvcc->GetDvLevel());
+            codec = workspace;
+        } else {
+            if (strcmp(coding, "avc1") == 0){
+                strcpy(coding, "dva1");
+            }else if (strcmp(coding, "avc3") == 0){
+                strcpy(coding, "dvav");
+            }else if (strcmp(coding, "hev1") == 0){
+                strcpy(coding, "dvhe");
+            }else if (strcmp(coding, "hvc1") == 0){
+                strcpy(coding, "dvh1");
+            }
+            AP4_FormatString(workspace,
+                            sizeof(workspace),
+                            "%s,%s.%02d.%02d",
+                            codec.GetChars(),
+                            coding,
+                            dvcc->GetDvProfile(),
+                            dvcc->GetDvLevel());
+            codec = workspace;
+        }
+        printf("    Codecs String: ");
+        printf("%s", codec.GetChars());
+        printf("\n");
         /* Dolby Vision */
         printf("    Dolby Vision:\n");
         printf("      Version:     %d.%d\n", dvcc->GetDvVersionMajor(), dvcc->GetDvVersionMinor());
@@ -699,6 +754,40 @@ ShowSampleDescription_Text(AP4_SampleDescription& description, bool verbose)
         printf("      EL Present:  %s\n", dvcc->GetElPresentFlag()?"true":"false");
         printf("      BL Present:  %s\n", dvcc->GetBlPresentFlag()?"true":"false");
         printf("      BL Signal Compatibility ID:  %d\n", dvcc->GetDvBlSignalCompatibilityID());
+    }else if (desc->GetType() == AP4_SampleDescription::TYPE_AVC || desc->GetType() == AP4_SampleDescription::TYPE_HEVC){
+        printf("    Codecs String: ");
+        printf("%s", codec.GetChars());
+        printf("\n");
+    }
+    
+    // VPx Specifics
+    if (desc->GetFormat() == AP4_SAMPLE_FORMAT_VP8 ||
+        desc->GetFormat() == AP4_SAMPLE_FORMAT_VP9 ||
+        desc->GetFormat() == AP4_SAMPLE_FORMAT_VP10) {
+        AP4_VpccAtom* vpcc = AP4_DYNAMIC_CAST(AP4_VpccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_VPCC));
+        if (vpcc) {
+            printf("    Profile:                  %d\n", vpcc->GetProfile());
+            printf("    Level:                    %d\n", vpcc->GetLevel());
+            printf("    Bit Depth:                %d\n", vpcc->GetBitDepth());
+            printf("    Chroma Subsampling:       %d\n", vpcc->GetChromaSubsampling());
+            printf("    Colour Primaries:         %d\n", vpcc->GetColourPrimaries());
+            printf("    Transfer Characteristics: %d\n", vpcc->GetTransferCharacteristics());
+            printf("    Matrix Coefficients:      %d\n", vpcc->GetMatrixCoefficients());
+            printf("    Video Full Range Flag:    %s\n", vpcc->GetVideoFullRangeFlag() ? "true" : "false");
+            AP4_String codec;
+            vpcc->GetCodecString(desc->GetFormat(), codec);
+            printf("    Codecs String:            %s", codec.GetChars());
+            printf("\n");
+        }
+    }
+
+    // Subtitles
+    if (desc->GetType() == AP4_SampleDescription::TYPE_SUBTITLES) {
+        AP4_SubtitleSampleDescription* subt_desc = AP4_DYNAMIC_CAST(AP4_SubtitleSampleDescription, desc);
+        printf("    Subtitles:\n");
+        printf("       Namespace:       %s\n", subt_desc->GetNamespace().GetChars());
+        printf("       Schema Location: %s\n", subt_desc->GetSchemaLocation().GetChars());
+        printf("       Image Mime Type: %s\n", subt_desc->GetImageMimeType().GetChars());
     }
 }
 
@@ -722,11 +811,14 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
     AP4_FormatFourChars(coding, desc->GetFormat());
     const char* format_name = AP4_GetFormatName(desc->GetFormat());
     printf("\"coding\":\"%s\",\n", coding);
-    printf("\"coding_name\":\"%s\",\n", format_name ? format_name : "");
+    printf("\"coding_name\":");
+    if (format_name) {
+        printf("\"%s\"", format_name);
+    } else {
+        printf("\"\"");
+    }
+
     AP4_String codec;
-    desc->GetCodecString(codec);
-    printf("\"codecs_string\":\"%s\"", codec.GetChars());
-    
     switch (desc->GetType()) {
       case AP4_SampleDescription::TYPE_MPEG: {
         // MPEG sample description
@@ -784,10 +876,11 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
             printf("\"");
             sep = ", ";
         }
-        printf("]");
+        printf("]\n");
+        avc_desc->GetCodecString(codec);
         break;
       }
-      
+
       case AP4_SampleDescription::TYPE_HEVC: {
         // HEVC Specifics
         AP4_HevcSampleDescription* hevc_desc = AP4_DYNAMIC_CAST(AP4_HevcSampleDescription, desc);
@@ -833,9 +926,10 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
             seq_sep = ",\n";
         }
         printf("]");
+        hevc_desc->GetCodecString(codec);
         break;
       }
-      
+
       case AP4_SampleDescription::TYPE_AV1: {
         // AV1 specifics
         AP4_Av1SampleDescription* av1_desc = AP4_DYNAMIC_CAST(AP4_Av1SampleDescription, desc);
@@ -880,7 +974,7 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
         printf(",\n");
         printf("\"width\":%d,\n",  video_desc->GetWidth());
         printf("\"height\":%d,\n", video_desc->GetHeight());
-        printf("\"depth\":%d",     video_desc->GetDepth());
+        printf("\"depth\":%d,",     video_desc->GetDepth());
     }
 
     switch (desc->GetFormat()) {
@@ -917,10 +1011,10 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
             printf("\",\n");
             printf("  \"data_rate\": %d,\n", dec3->GetDataRate());
             if (dec3->GetFlagEC3ExtensionTypeA()){
-                printf("  \"Dolby_Atmos\": \"Yes\",\n");
+                printf("  \"atmos\": \"Yes\",\n");
                 printf("  \"complexity_index\": %d,\n", dec3->GetComplexityIndexTypeA());
             } else {
-                printf("  \"Dolby_Atmos\": \"No\",\n");
+                printf("  \"atmos\": \"No\",\n");
             }
             printf("  \"substreams\": [\n");
             const char* sep = "";
@@ -979,32 +1073,61 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
                         if (presentation.d.v1.b_multi_pid == 0) { self_contained ++; }
                         if (presentation.d.v1.b_presentation_channel_coded == 1) {
                             AP4_FormatString(presentation_type, sizeof(presentation_type), "Channel based");
-                            if (presentation.d.v1.dsi_presentation_ch_mode >= 11 && presentation.d.v1.dsi_presentation_ch_mode <= 15) {
+                            if (presentation.d.v1.dsi_presentation_ch_mode == 15 ||
+                                (presentation.d.v1.dsi_presentation_ch_mode >= 11 && presentation.d.v1.dsi_presentation_ch_mode <= 14 && presentation.d.v1.pres_top_channel_pairs > 0)) {
                                 AP4_FormatString(presentation_type, sizeof(presentation_type), "Channel based immsersive");
                             }
                         } else {
                             AP4_FormatString(presentation_type, sizeof(presentation_type), "Object based");
+                            if (presentation.d.v1.substream_groups->d.v1.substreams && presentation.d.v1.substream_groups->d.v1.substreams->b_ajoc == 1) {
+                                printf("\"Objects number\": %d, ", presentation.d.v1.substream_groups->d.v1.substreams->n_umx_objects_minus1 + 1 + 1);
+                            }
                         }
                         if (presentation.presentation_version == 2) {
                             printf("\"Stream Type\": \"Immersive stereo\", ");
                         } else {
                             printf("\"Stream Type\": \"%s\", ", presentation_type);
                         }
-                        printf("\"presentation_id\": %d, ", presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1);
+                        AP4_SI32 presentation_id = 0;
+                        presentation_id = presentation.d.v1.b_presentation_id? presentation.d.v1.presentation_id : -1;
+                        presentation_id = presentation.d.v1.b_extended_presentation_id? presentation.d.v1.extended_presentation_id : presentation_id;
+                        printf("\"presentation_id\": %d, ", presentation_id);
+                        printf("\"Codec String\": \"%s\", ", presentation_codec);
                         printf("\"presentation_channel_mask_v1\": %u, ",presentation.d.v1.presentation_channel_mask_v1);
-                        printf("\"Dolby Atmos source\": \"%s\", ", presentation.d.v1.dolby_atmos_indicator? "Yes": "No");
+                        printf("\"Dolby Atmos source\": \"%s\", ", presentation.d.v1.immersive_audio_indicator? "Yes": "No");
                         printf("\"Language\": \"%s\", ", presentation_lang);
                         printf("\"Self Contained\": \"%s\"} ", presentation.d.v1.b_multi_pid? "No": "Yes");
                         separator = ",\n";
                     }
                 }
+                printf("\n  ],\n");
+                printf("  \"Self Contained\": \"%s\",\n", (self_contained == dsi.d.v1.n_presentations) ? "Yes": ((self_contained == 0)? "No": "Part"));
             }
-            printf("\n  ],\n");
-
-            printf("  \"Self Contained\": \"%s\",\n", (self_contained == dsi.d.v1.n_presentations) ? "Yes": ((self_contained == 0)? "No": "Part"));
             printf("  \"dac4_payload\": \"");
             ShowData(dac4->GetRawBytes());
-            printf("\"\n}");
+            printf("\"\n},\n");
+            
+            printf("\"codecs_string\":\"");
+            AP4_String codec;
+            dac4->GetCodecString(codec);
+            printf("%s", codec.GetChars());
+            printf("\"");
+        }
+        break;
+	  }
+      case AP4_SAMPLE_FORMAT_MLPA: {
+        AP4_DmlpAtom* dmlp = AP4_DYNAMIC_CAST(AP4_DmlpAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DMLP));
+        if (dmlp) {
+            printf(",\n");
+            printf("\"Dolby_TrueHD_info\": {\n");
+            printf("  \"dmlp_payload\": \"");
+            ShowData(dmlp->GetRawBytes());
+            printf("\",\n");
+            printf("  \"stream_info\": {\n");
+            printf("    \"format_info\": %d,\n", dmlp->GetStreamInfo().format_info);
+            printf("    \"peak_data_rate\": %d\n", dmlp->GetStreamInfo().peak_data_rate);
+            printf("  }\n");
+            printf("}");
         }
         break;
       }
@@ -1030,11 +1153,14 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
         break;
       }
     }
-        
+
     // Dolby Vision specifics
     AP4_DvccAtom* dvcc = AP4_DYNAMIC_CAST(AP4_DvccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DVCC));
     if(!dvcc) {
         dvcc = AP4_DYNAMIC_CAST(AP4_DvccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DVVC));
+    }
+    if(!dvcc) {
+        dvcc = AP4_DYNAMIC_CAST(AP4_DvccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_DVWC));
     }
     if (dvcc) {
         /* Codec String */
@@ -1044,7 +1170,8 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
         coding[4] = '\0';
         /* Non back-compatible */
         if (strcmp(coding, "dvav") == 0 || strcmp(coding, "dva1") == 0 ||
-            strcmp(coding, "dvhe") == 0 || strcmp(coding, "dvh1") == 0){
+            strcmp(coding, "dvhe") == 0 || strcmp(coding, "dvh1") == 0 ||
+            strcmp(coding, "davc") == 0) {
             AP4_FormatString(workspace,
                             sizeof(workspace),
                             "%s.%02d.%02d",
@@ -1071,8 +1198,7 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
                             dvcc->GetDvLevel());
             codec = workspace;
         }
-        printf(",\n");
-        printf("\"dv_codecs_string\":\"");
+        printf("\"codecs_string\":\"");
         printf("%s", codec.GetChars());
         printf("\"");
         /* Dolby Vision */
@@ -1089,6 +1215,35 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
         printf("   \"bl_present\": %s,\n", dvcc->GetBlPresentFlag()?"true":"false");
         printf("   \"dv_bl_signal_compatibility_id\": %d\n", dvcc->GetDvBlSignalCompatibilityID());
         printf("}");
+    }else if (desc->GetType() == AP4_SampleDescription::TYPE_AVC || desc->GetType() == AP4_SampleDescription::TYPE_HEVC) {
+        printf("\"codecs_string\":\"");
+        printf("%s", codec.GetChars());
+        printf("\"");
+    }
+
+    // VPx Specifics
+    if (desc->GetFormat() == AP4_SAMPLE_FORMAT_VP8 ||
+        desc->GetFormat() == AP4_SAMPLE_FORMAT_VP9 ||
+        desc->GetFormat() == AP4_SAMPLE_FORMAT_VP10) {
+        AP4_VpccAtom* vpcc = AP4_DYNAMIC_CAST(AP4_VpccAtom, desc->GetDetails().GetChild(AP4_ATOM_TYPE_VPCC));
+        if (vpcc) {
+            printf(",\n");
+            printf("\"vpx_info\": {\n");
+            printf("    \"profile\":%d,\n", vpcc->GetProfile());
+            printf("    \"level\":%d,\n", vpcc->GetLevel());
+            printf("    \"bit_depth\":%d,\n", vpcc->GetBitDepth());
+            printf("    \"chroma_subsampling\":%d,\n", vpcc->GetChromaSubsampling());
+            printf("    \"colour_primaries\":%d,\n", vpcc->GetColourPrimaries());
+            printf("    \"transfer_characteristics\":%d,\n", vpcc->GetTransferCharacteristics());
+            printf("    \"matrix_coefficients\":%d,\n", vpcc->GetMatrixCoefficients());
+            printf("    \"video_full_range_flag\":%s\n", vpcc->GetVideoFullRangeFlag() ? "true" : "false");
+            printf("},\n");
+            printf("\"codecs_string\":\"");
+            AP4_String codec;
+            vpcc->GetCodecString(desc->GetFormat(), codec);
+            printf("%s", codec.GetChars());
+            printf("\"");
+        }
     }
 
     // Color information from colr atom for non-VPx tracks
@@ -1107,6 +1262,17 @@ ShowSampleDescription_Json(AP4_SampleDescription& description, bool verbose)
         }
     }
 
+    // Subtitles
+    if (desc->GetType() == AP4_SampleDescription::TYPE_SUBTITLES) {
+        printf(",\n");
+        printf("\"subtitles\": {\n");
+        AP4_SubtitleSampleDescription* subt_desc = AP4_DYNAMIC_CAST(AP4_SubtitleSampleDescription, desc);
+        printf("  \"namespace\": \"%s\",\n",       subt_desc->GetNamespace().GetChars());
+        printf("  \"schema_location\": \"%s\",\n", subt_desc->GetSchemaLocation().GetChars());
+        printf("  \"image_mime_type\": \"%s\"\n",  subt_desc->GetImageMimeType().GetChars());
+        printf("}");
+    }
+    
     printf("\n}");
 }
 
@@ -1229,12 +1395,12 @@ ShowAvcInfo(const AP4_DataBuffer& sample_data, AP4_AvcSampleDescription* avc_des
                     case 0: printf("<P>");  break;
                     case 1: printf("<B>");  break;
                     case 2: printf("<I>");  break;
-                    case 3:	printf("<SP>"); break;
+                    case 3: printf("<SP>"); break;
                     case 4: printf("<SI>"); break;
                     case 5: printf("<P>");  break;
                     case 6: printf("<B>");  break;
                     case 7: printf("<I>");  break;
-                    case 8:	printf("<SP>"); break;
+                    case 8: printf("<SP>"); break;
                     case 9: printf("<SI>"); break;
                     default: printf("<S/%d>", slice_type); break;
                 }
@@ -1376,7 +1542,7 @@ ShowTrackInfo_Text(AP4_Movie& movie, AP4_Track& track, AP4_ByteStream& stream, b
         printf(" IN-PREVIEW");
     }
     printf("\n");
-	printf("  id:           %d\n", track.GetId());
+    printf("  id:           %d\n", track.GetId());
     printf("  type:         ");
     switch (track.GetType()) {
         case AP4_Track::TYPE_AUDIO:     printf("Audio\n");     break;
@@ -1470,7 +1636,7 @@ ShowTrackInfo_Json(AP4_Movie& movie, AP4_Track& track, AP4_ByteStream& stream, b
         printf("%s\"IN-PREVIEW\"", sep);
     }
     printf("],\n");
-	printf("  \"id\":%d,\n", track.GetId());
+    printf("  \"id\":%d,\n", track.GetId());
     printf("  \"type\":");
     switch (track.GetType()) {
         case AP4_Track::TYPE_AUDIO:     printf("\"Audio\"");     break;
@@ -1566,8 +1732,8 @@ ShowMovieInfo(AP4_Movie& movie)
     switch (Options.format) {
         case TEXT_FORMAT:
             printf("Movie:\n");
-            printf("  duration:   %lld (movie timescale units)\n", movie.GetDuration());
-            printf("  duration:   %d (ms)\n", movie.GetDurationMs());
+            printf("  duration:   %d ms\n", movie.GetDurationMs());
+            printf("  duration:   %lld\n", movie.GetDuration());
             printf("  time scale: %d\n", movie.GetTimeScale());
             printf("  fragments:  %s\n", movie.HasFragments()?"yes":"no");
             printf("\n");

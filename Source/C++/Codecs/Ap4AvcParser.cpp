@@ -237,7 +237,13 @@ AP4_AvcSequenceParameterSet::AP4_AvcSequenceParameterSet() :
     frame_crop_left_offset(0),
     frame_crop_right_offset(0),
     frame_crop_top_offset(0),
-    frame_crop_bottom_offset(0)
+    frame_crop_bottom_offset(0),
+    timing_info_present_flag(0),
+    num_units_in_tick(0),
+    time_scale(0),
+    fixed_frame_rate_flag(0),
+    pic_struct_present_flag(0),
+    pic_struct(0)
 {
     AP4_SetMemory(scaling_list_4x4, 0, sizeof(scaling_list_4x4));
     AP4_SetMemory(use_default_scaling_matrix_4x4, 0, sizeof(use_default_scaling_matrix_4x4));
@@ -261,6 +267,72 @@ AP4_AvcSequenceParameterSet::GetInfo(unsigned int& width, unsigned int& height)
 		if (crop_h < width) width   -= crop_h;
 		if (crop_v < height) height -= crop_v;
 	}
+}
+
+void hrd_parameters(AP4_BitReader& bits) {
+    ReadGolomb(bits); // cpb_cnt_minus1
+    bits.SkipBits(4); // bit_rate_scale
+    bits.SkipBits(4); // cpb_size_scale
+    for (unsigned int i=0; i<=ReadGolomb(bits); i++) {
+        ReadGolomb(bits); // bit_rate_value_minus1
+        ReadGolomb(bits); // cpb_size_value_minus1
+        bits.SkipBits(1); // cbr_flag
+    }
+    bits.SkipBits(5); // initial_cpb_removal_delay_length_minus1
+    bits.SkipBits(5); // cpb_removal_delay_length_minus1
+    bits.SkipBits(5); // dpb_output_delay_length_minus1
+    bits.SkipBits(5); // time_offset_length
+}
+
+void vui_parameters(AP4_AvcSequenceParameterSet& sps, AP4_BitReader& bits) {
+    AP4_UI08 aspect_ratio_info_present_flag = bits.ReadBit(); // aspect_ratio_info_present_flag
+    if (aspect_ratio_info_present_flag) {
+        AP4_UI16 aspect_ratio_idc = bits.ReadBits(8); // aspect_ratio_idc
+        if (aspect_ratio_idc == 255) { // Extended_SAR
+            bits.SkipBits(16); // sar_width
+            bits.SkipBits(16); // sar_height
+        }
+    }
+    AP4_UI08 overscan_info_present_flag = bits.ReadBit(); // overscan_info_present_flag
+    if (overscan_info_present_flag) {
+        bits.SkipBits(1); // overscan_appropriate_flag
+    }
+    AP4_UI08 video_signal_type_present_flag = bits.ReadBit(); // video_signal_type_present_flag
+    if (video_signal_type_present_flag) {
+        bits.SkipBits(3); // video_format
+        bits.SkipBits(1); // video_full_range_flag
+        AP4_UI08 colour_description_present_flag = bits.ReadBit(); // colour_description_present_flag
+        if (colour_description_present_flag) {
+            bits.SkipBits(8); // colour_primaries
+            bits.SkipBits(8); // transfer_characteristics
+            bits.SkipBits(8); // matrix_coefficients
+        }
+    }
+    AP4_UI08 chroma_loc_info_present_flag = bits.ReadBit(); // chroma_loc_info_present_flag
+    if (chroma_loc_info_present_flag) {
+        ReadGolomb(bits); // chroma_sample_loc_type_top_field
+        ReadGolomb(bits); // chroma_sample_loc_type_bottom_field
+    }
+    sps.timing_info_present_flag = bits.ReadBit(); // timing_info_present_flag
+    if (sps.timing_info_present_flag) {
+        sps.num_units_in_tick = bits.ReadBits(32); // num_units_in_tick
+        sps.time_scale = bits.ReadBits(32); // time_scale
+        sps.fixed_frame_rate_flag = bits.ReadBit(); // fixed_frame_rate_flag
+    }
+    sps.nal_hrd_parameters_present_flag = bits.ReadBit(); // nal_hrd_parameters_present_flag
+    if (sps.nal_hrd_parameters_present_flag) {
+        hrd_parameters(bits);
+    }
+    sps.vcl_hrd_parameters_present_flag = bits.ReadBit(); // vcl_hrd_parameters_present_flag
+    if (sps.vcl_hrd_parameters_present_flag) {
+        hrd_parameters(bits);
+    }
+    if (sps.nal_hrd_parameters_present_flag || sps.vcl_hrd_parameters_present_flag) {
+        bits.SkipBits(1); // low_delay_hrd_flag
+    }
+    sps.pic_struct_present_flag = bits.ReadBit(); // pic_struct_present_flag
+    AP4_UI08 bitstream_restriction_flag = bits.ReadBit(); // bitstream_restriction_flag
+    // skip the rest of the vui parameters, we don't need them for now
 }
 
 /*----------------------------------------------------------------------
@@ -373,7 +445,7 @@ AP4_AvcFrameParser::ParseSPS(const unsigned char*         data,
         sps.frame_crop_top_offset    = ReadGolomb(bits);
         sps.frame_crop_bottom_offset = ReadGolomb(bits);
     }
-
+    vui_parameters(sps, bits);
     return AP4_SUCCESS;
 }
 
@@ -426,6 +498,7 @@ AP4_AvcFrameParser::ParsePPS(const unsigned char*        data,
         return AP4_ERROR_INVALID_FORMAT;
     }
     pps.seq_parameter_set_id     = ReadGolomb(bits);
+    m_active_sps_id = pps.seq_parameter_set_id;
     if (pps.seq_parameter_set_id > AP4_AVC_SPS_MAX_ID) {
         return AP4_ERROR_INVALID_FORMAT;
     }
@@ -481,6 +554,58 @@ AP4_AvcFrameParser::ParsePPS(const unsigned char*        data,
     pps.redundant_pic_cnt_present_flag         = bits.ReadBit();
     
     return AP4_SUCCESS;
+}
+
+void pic_timing(AP4_BitReader& bits, AP4_AvcSequenceParameterSet* sps)
+{
+    AP4_UI08 CpbDpbDelaysPresentFlag = sps->nal_hrd_parameters_present_flag || sps->vcl_hrd_parameters_present_flag;
+    if (CpbDpbDelaysPresentFlag) {
+        ReadGolomb(bits); // cpb_removal_delay
+        ReadGolomb(bits); // dpb_output_delay
+    }
+    if (sps->pic_struct_present_flag) {
+        sps->pic_struct = bits.ReadBits(4); // pic_struct
+        // skip the rest of the pic timing SEI message, we don't need it for now
+    }
+}
+
+void
+AP4_AvcFrameParser::ParseSEI(const unsigned char*        data,
+                            unsigned int                data_size)
+{
+    AP4_DataBuffer unescaped(data, data_size);
+    AP4_NalParser::Unescape(unescaped);
+    AP4_BitReader bits(unescaped.GetData(), unescaped.GetDataSize());
+
+    bits.SkipBits(16); // NAL Unit Header
+
+    AP4_UI32 sei_payload_type = 0;
+    while (bits.PeekBits(8) == 0xFF) {
+        bits.SkipBits(8);
+        sei_payload_type += 255;
+    }
+    AP4_UI08 last_payload_type_byte = bits.ReadBits(8);
+    sei_payload_type += last_payload_type_byte;
+
+    AP4_UI32 sei_payload_size = 0;
+    while (bits.PeekBits(8) == 0xFF) {
+        bits.SkipBits(8);
+        sei_payload_size += 255;
+    }
+    AP4_UI08 last_payload_size_byte = bits.ReadBits(8);
+    sei_payload_size += last_payload_size_byte;
+
+    if (sei_payload_type == 1) { // pic_timing
+        AP4_AvcSequenceParameterSet* sps = m_SPS[m_active_sps_id];
+        if (sps) {
+            pic_timing(bits, sps);
+        } else {
+            DBG_PRINTF_0("AP4_AvcFrameParser::ParseSEI: no SPS available for pic_timing SEI message\n");
+        }
+    } else {
+        return; // ignore other SEI messages
+    }
+
 }
 
 /*----------------------------------------------------------------------
@@ -1041,6 +1166,7 @@ AP4_AvcFrameParser::Feed(const AP4_UI08* nal_unit,
             if (primary_pic_type_name == NULL) primary_pic_type_name = "UNKNOWN";
             DBG_PRINTF_2("[%d:%s]\n", primary_pic_type, primary_pic_type_name);
 
+            AppendNalUnitData(nal_unit, nal_unit_size);
             CheckIfAccessUnitIsCompleted(access_unit_info);
         } else if (nal_unit_type == AP4_AVC_NAL_UNIT_TYPE_CODED_SLICE_OF_NON_IDR_PICTURE ||
                    nal_unit_type == AP4_AVC_NAL_UNIT_TYPE_CODED_SLICE_OF_IDR_PICTURE     ||
@@ -1052,7 +1178,6 @@ AP4_AvcFrameParser::Feed(const AP4_UI08* nal_unit,
                                       nal_ref_idc,
                                       *slice_header);
             if (AP4_FAILED(result)) {
-                delete slice_header;
                 return AP4_ERROR_INVALID_FORMAT;
             }
             
@@ -1094,8 +1219,10 @@ AP4_AvcFrameParser::Feed(const AP4_UI08* nal_unit,
                 m_PPS[pps->pic_parameter_set_id] = pps;
                 DBG_PRINTF_2("PPS sps_id=%d, pps_id=%d\n", pps->seq_parameter_set_id, pps->pic_parameter_set_id);
                 
-                // keep the PPS with the NAL unit (this is optional)
-                AppendNalUnitData(nal_unit, nal_unit_size);
+                // keep the PPS with the NAL unit (if sample entry box named "avc1", it should not be kept)
+                if (m_keepParameterSets) {
+                    AppendNalUnitData(nal_unit, nal_unit_size);
+                }
                 CheckIfAccessUnitIsCompleted(access_unit_info);
             }
         } else if (nal_unit_type == AP4_AVC_NAL_UNIT_TYPE_SPS) {
@@ -1108,9 +1235,15 @@ AP4_AvcFrameParser::Feed(const AP4_UI08* nal_unit,
                 delete m_SPS[sps->seq_parameter_set_id];
                 m_SPS[sps->seq_parameter_set_id] = sps;
                 DBG_PRINTF_1("SPS sps_id=%d\n", sps->seq_parameter_set_id);
+
+                // keep the SPS with the NAL unit (if sample entry box named "avc1", it should not be kept)
+                if (m_keepParameterSets) {
+                    AppendNalUnitData(nal_unit, nal_unit_size);
+                }
                 CheckIfAccessUnitIsCompleted(access_unit_info);
             }
         } else if (nal_unit_type == AP4_AVC_NAL_UNIT_TYPE_SEI) {
+            ParseSEI(nal_unit, nal_unit_size);
             AppendNalUnitData(nal_unit, nal_unit_size);
             CheckIfAccessUnitIsCompleted(access_unit_info);
             DBG_PRINTF_0("\n");

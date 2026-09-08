@@ -22,8 +22,12 @@ import urllib.request, urllib.error, urllib.parse
 import shutil
 import json
 import sys
-from xml.etree import ElementTree
-from subprocess import check_output, CalledProcessError
+import xml.etree.ElementTree as xml
+import defusedxml.ElementTree as defused_xml
+xml.parse = defused_xml.parse
+xml.fromstring = defused_xml.fromstring
+
+from subprocess import check_output, CalledProcessError # nosec B404
 
 # constants
 DASH_NS_URN_COMPAT = 'urn:mpeg:DASH:schema:MPD:2011'
@@ -43,7 +47,7 @@ def Bento4Command(name, *args, **kwargs):
     cmd += args
     #print cmd
     try:
-        return check_output(cmd)
+        return check_output(cmd) # nosec B603
     except CalledProcessError as e:
         #print e
         raise Exception("binary tool failed with error %d" % e.returncode)
@@ -270,7 +274,7 @@ class DashMPD:
         return result
 
 def ParseMpd(url, xml):
-    mpd_tree = ElementTree.XML(xml)
+    mpd_tree = xml.XML(xml)
     if mpd_tree.tag.startswith(DASH_NS_COMPAT):
         global DASH_NS
         global DASH_NS_URN
@@ -302,7 +306,10 @@ def OpenURL(url):
     if url.startswith("file://"):
         return open(url[7:], 'rb')
     else:
-        return urllib.request.urlopen(url)
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.scheme not in ['http', 'https']:
+            raise Exception('Unsupported URL scheme: '+parsed_url.scheme)
+        return urllib.request.urlopen(url, timeout=30) # nosec B310
 
 def ComputeUrl(base_url, url):
     if url.startswith('http://') or url.startswith('https://'):
@@ -426,8 +433,8 @@ def main():
     mpd_xml = mpd_xml.replace('nitialisation', 'nitialization')
     mpd = ParseMpd(mpd_url, mpd_xml)
 
-    ElementTree.register_namespace('', DASH_NS_URN)
-    ElementTree.register_namespace('mas', MARLIN_MAS_NS_URN)
+    xml.register_namespace('', DASH_NS_URN)
+    xml.register_namespace('mas', MARLIN_MAS_NS_URN)
 
     cloner = Cloner(output_dir)
     for period in mpd.periods:
@@ -462,15 +469,15 @@ def main():
     if Options.encrypt:
         for p in mpd.xml.findall(DASH_NS+'Period'):
             for s in p.findall(DASH_NS+'AdaptationSet'):
-                cp = ElementTree.Element(DASH_NS+'ContentProtection', schemeIdUri='urn:uuid:5E629AF5-38DA-4063-8977-97FFBD9902D4')
+                cp = xml.Element(DASH_NS+'ContentProtection', schemeIdUri='urn:uuid:5E629AF5-38DA-4063-8977-97FFBD9902D4')
                 cp.tail = s.tail
-                cids = ElementTree.SubElement(cp, MARLIN_MAS_NS+'MarlinContentIds')
-                cid = ElementTree.SubElement(cids, MARLIN_MAS_NS+'MarlinContentId')
+                cids = xml.SubElement(cp, MARLIN_MAS_NS+'MarlinContentIds')
+                cid = xml.SubElement(cids, MARLIN_MAS_NS+'MarlinContentId')
                 cid.text = 'urn:marlin:kid:'+Options.kid.encode('hex')
                 s.insert(0, cp)
 
     # write the MPD
-    xml_tree = ElementTree.ElementTree(mpd.xml)
+    xml_tree = xml.ElementTree(mpd.xml)
     xml_tree.write(path.join(output_dir, path.basename(urllib.parse.urlparse(mpd_url).path)), encoding="UTF-8", xml_declaration=True)
 
 ###########################

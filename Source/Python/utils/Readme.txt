@@ -1,0 +1,2 @@
+mp4-dash.py is used to generate regular MPEG-DASH stream, and HLS stream with fMP4 container.
+mp4-dash-atsc3-only.py is an internal script used to generate ATSC 3.0 DASH stream. It only support DD+, AC-4 multi-presentation stream (fat), H.264 and H.265. Dolby Vision is not supported yet.

@@ -49,7 +49,7 @@ public:
 
     // types
     struct SubStream {
-		SubStream() : fscod(0), bsid(0), bsmod(0), acmod(0), lfeon(0), num_dep_sub(0), chan_loc(0) {}
+        SubStream() : fscod(0), bsid(0), bsmod(0), acmod(0), lfeon(0), num_dep_sub(0), chan_loc(0) {}
         unsigned int fscod;
         unsigned int bsid;
         unsigned int bsmod;

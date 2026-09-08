@@ -5,6 +5,7 @@ import json
 import urllib.request, urllib.parse, urllib.error
 
 KEKID_CONSTANT_1 = b"KEKID_1"
+HTTP_TIMEOUT_SECONDS = 30
 
 def WrapKey(key, kek):
     if len(key) > 16:
@@ -113,7 +114,7 @@ def UnwrapKey(key, kek):
 def ComputeKekId(kek):
     if len(kek) > 16:
         kek = bytes.fromhex(kek)
-    sha1 = hashlib.sha1()
+    sha1 = hashlib.sha1(usedforsecurity=False) # use for id but not signature, so don't use a security-sensitive hash function
     sha1.update(KEKID_CONSTANT_1)
     sha1.update(kek)
     return '#1.'+sha1.digest()[0:16].hex()
@@ -161,7 +162,7 @@ def ResolveKey(options, spec):
         if options.debug:
             print('Request:', base_url)
 
-        response = requests.get(base_url)
+        response = requests.get(base_url, timeout=HTTP_TIMEOUT_SECONDS)
     elif skm_mode == 'auto':
         if skm_kek:
             # generate a key locally and wrap it
@@ -175,7 +176,7 @@ def ResolveKey(options, spec):
         if options.debug:
             print('Request:', base_url, json.dumps(key_object))
 
-        response = requests.post(base_url, headers={'content-type': 'application/json'}, data=json.dumps(key_object))
+        response = requests.post(base_url, headers={'content-type': 'application/json'}, data=json.dumps(key_object), timeout=HTTP_TIMEOUT_SECONDS)
     else:
         raise Exception('Unsupported SKM query mode')
 

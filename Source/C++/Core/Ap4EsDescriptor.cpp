@@ -95,7 +95,7 @@ AP4_EsDescriptor::AP4_EsDescriptor(AP4_ByteStream& stream,
             payload_size -= url_length;
         }
     }
-    if (m_Flags & AP4_ES_DESCRIPTOR_FLAG_OCR_STREAM) {
+    if (m_Flags & AP4_ES_DESCRIPTOR_FLAG_URL) {
         if (payload_size < 2) return;
         stream.ReadUI16(m_OcrEsId);
         payload_size -= 2;

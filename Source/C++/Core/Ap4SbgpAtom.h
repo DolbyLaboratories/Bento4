@@ -54,8 +54,13 @@ public:
 
     // methods
     AP4_SbgpAtom();
+    ~AP4_SbgpAtom();
     virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);
     virtual AP4_Result WriteFields(AP4_ByteStream& stream);
+    AP4_Result AddEntry(AP4_UI32 sc, AP4_UI32 idx);
+    AP4_Result SetGroupType(AP4_UI32 group_type);
+    AP4_Result SetGroupTypeParameter(AP4_UI32 group_type_param);
+    AP4_Result ResetSize();
 
     // accessors
     AP4_UI32 GetGroupingType()          { return m_GroupingType;          }

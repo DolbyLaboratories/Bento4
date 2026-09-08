@@ -2,7 +2,7 @@
 |
 |    AP4 - dmlp Atoms
 |
-|    Copyright 2002-2018 Axiomatic Systems, LLC
+|    Copyright 2002-2019 Axiomatic Systems, LLC
 |
 |
 |    This file is part of Bento4/AP4 (MP4 Atom Processing Library).
@@ -29,7 +29,6 @@
 /*----------------------------------------------------------------------
 |   includes
 +---------------------------------------------------------------------*/
-#include "Ap4Atom.h"
 #include "Ap4DmlpAtom.h"
 #include "Ap4AtomFactory.h"
 #include "Ap4Utils.h"
@@ -46,48 +45,60 @@ AP4_DEFINE_DYNAMIC_CAST_ANCHOR(AP4_DmlpAtom)
 AP4_DmlpAtom*
 AP4_DmlpAtom::Create(AP4_Size size, AP4_ByteStream& stream)
 {
-    if (size < AP4_ATOM_HEADER_SIZE + 10) {
-        return NULL;
-    }
-    
-    AP4_UI32 format_info;
-    stream.ReadUI32(format_info);
-    AP4_UI16 peak_data_rate;
-    stream.ReadUI16(peak_data_rate);
-    AP4_UI32 reserved;
-    stream.ReadUI32(reserved);
-    
-    return new AP4_DmlpAtom(format_info, peak_data_rate);
+    // read the raw bytes in a buffer
+    unsigned int payload_size = size - AP4_ATOM_HEADER_SIZE;
+    AP4_DataBuffer payload_data(payload_size);
+    AP4_Result result = stream.Read(payload_data.UseData(), payload_size);
+    if (AP4_FAILED(result)) return NULL;
+
+    const AP4_UI08* payload = payload_data.GetData();
+    return new AP4_DmlpAtom(size, payload);
 }
 
 /*----------------------------------------------------------------------
 |   AP4_DmlpAtom::AP4_DmlpAtom
 +---------------------------------------------------------------------*/
-AP4_DmlpAtom::AP4_DmlpAtom(AP4_UI32 format_info, AP4_UI16 peak_data_rate) :
-    AP4_Atom(AP4_ATOM_TYPE_DMLP, AP4_ATOM_HEADER_SIZE),
-    m_FormatInfo(format_info),
-    m_PeakDataRate(peak_data_rate)
-{
-    m_Size32 += 10;
-}
-
-/*----------------------------------------------------------------------
-|   AP4_DmlpAtom::AP4_DmlpAtom
-+---------------------------------------------------------------------*/
-AP4_DmlpAtom::AP4_DmlpAtom(const AP4_DmlpAtom& other):
+AP4_DmlpAtom::AP4_DmlpAtom(const AP4_DmlpAtom& other) :
     AP4_Atom(AP4_ATOM_TYPE_DMLP, other.m_Size32),
-    m_FormatInfo(other.m_FormatInfo),
-    m_PeakDataRate(other.m_PeakDataRate)
-{
+    m_RawBytes(other.m_RawBytes),
+    m_StreamInfo(other.m_StreamInfo) {
 }
 
 /*----------------------------------------------------------------------
-|   AP4_DmlpAtom::GetCodecString
+|   AP4_DmlpAtom::AP4_DmlpAtom
 +---------------------------------------------------------------------*/
-void
-AP4_DmlpAtom::GetCodecString(AP4_String& codec)
+AP4_DmlpAtom::AP4_DmlpAtom(AP4_UI32 size, const StreamInfo* m_StreamInfo) :
+    AP4_Atom(AP4_ATOM_TYPE_DMLP, AP4_ATOM_HEADER_SIZE) {
+    AP4_BitWriter bits(size);
+
+    bits.Write(m_StreamInfo->format_info, 32);
+    bits.Write(m_StreamInfo->peak_data_rate, 15);
+    bits.Write(0, 1);   // reserved
+    bits.Write(0, 32);  // reserved 
+
+    m_RawBytes.SetData(bits.GetData(), bits.GetBitCount() / 8);
+    m_Size32 += m_RawBytes.GetDataSize();
+}
+
+/*----------------------------------------------------------------------
+|   AP4_DmlpAtom::AP4_DmlpAtom
++---------------------------------------------------------------------*/
+AP4_DmlpAtom::AP4_DmlpAtom(AP4_UI32 size, const AP4_UI08* payload) :
+    AP4_Atom(AP4_ATOM_TYPE_DMLP, size)
 {
-    codec = "mlpa";
+    // make a copy of our configuration bytes
+    unsigned int payload_size = size - AP4_ATOM_HEADER_SIZE;
+    m_RawBytes.SetData(payload, payload_size);
+
+    // sanity check
+    if (payload_size < 10) {
+        memset(&m_StreamInfo, 0, sizeof(m_StreamInfo));
+        return;
+    }
+
+    // parse the payload
+    m_StreamInfo.format_info = (payload[0] << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3];
+    m_StreamInfo.peak_data_rate = ((payload[4] << 7) | (payload[5] >> 1)) & 0x7fff;
 }
 
 /*----------------------------------------------------------------------
@@ -96,16 +107,7 @@ AP4_DmlpAtom::GetCodecString(AP4_String& codec)
 AP4_Result
 AP4_DmlpAtom::WriteFields(AP4_ByteStream& stream)
 {
-    AP4_Result result;
-    
-    result = stream.WriteUI32(m_FormatInfo);
-    if (AP4_FAILED(result)) return result;
-    result = stream.WriteUI16(m_PeakDataRate << 1);
-    if (AP4_FAILED(result)) return result;
-    result = stream.WriteUI32(0);
-    if (AP4_FAILED(result)) return result;
-
-    return AP4_SUCCESS;
+    return stream.Write(m_RawBytes.GetData(), m_RawBytes.GetDataSize());
 }
 
 /*----------------------------------------------------------------------
@@ -114,8 +116,8 @@ AP4_DmlpAtom::WriteFields(AP4_ByteStream& stream)
 AP4_Result
 AP4_DmlpAtom::InspectFields(AP4_AtomInspector& inspector)
 {
-    inspector.AddField("format_info", m_FormatInfo);
-    inspector.AddField("peak_data_rate", m_PeakDataRate);
+    // inspector.AddField("data_rate", m_DataRate);
+    inspector.AddField("format_info", m_StreamInfo.format_info);
+    inspector.AddField("peak_data_rate", m_StreamInfo.peak_data_rate);
     return AP4_SUCCESS;
 }
-

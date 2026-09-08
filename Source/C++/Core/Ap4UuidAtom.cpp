@@ -150,11 +150,8 @@ AP4_UnknownUuidAtom::AP4_UnknownUuidAtom(AP4_UI64 size, AP4_ByteStream& stream) 
     AP4_UuidAtom(size, false, stream)
 {
     // store the data
-    AP4_Size header_size = GetHeaderSize();
-    if (size > header_size) {
-        m_Data.SetDataSize((AP4_Size)size-GetHeaderSize());
-        stream.Read(m_Data.UseData(), m_Data.GetDataSize());
-    }
+    m_Data.SetDataSize((AP4_Size)size-GetHeaderSize());
+    stream.Read(m_Data.UseData(), m_Data.GetDataSize());
 }
 
 /*----------------------------------------------------------------------
@@ -164,11 +161,8 @@ AP4_UnknownUuidAtom::AP4_UnknownUuidAtom(AP4_UI64 size, const AP4_UI08* uuid, AP
     AP4_UuidAtom(size, uuid)
 {
     // store the data
-    AP4_Size header_size = GetHeaderSize();
-    if (size > header_size) {
-        m_Data.SetDataSize((AP4_Size)size-GetHeaderSize());
-        stream.Read(m_Data.UseData(), m_Data.GetDataSize());
-    }
+    m_Data.SetDataSize((AP4_Size)size-GetHeaderSize());
+    stream.Read(m_Data.UseData(), m_Data.GetDataSize());
 }
 
 /*----------------------------------------------------------------------

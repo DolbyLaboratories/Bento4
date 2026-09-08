@@ -508,6 +508,15 @@ AP4_Eac3Parser::FindFrame(AP4_Eac3Frame& frame)
         else if (!AP4_Eac3Header::MatchFixed(eac3_header, peek_eac3_header)) {
             goto fail;
         }
+
+        AP4_UI32 total_frame_size = eac3_header.m_FrameSize + dependent_stream_length;
+        if (available < total_frame_size) {
+            if ((m_Bits.m_Flags & AP4_BITSTREAM_FLAG_EOS) == 0) {
+                return AP4_ERROR_NOT_ENOUGH_DATA;
+            }
+            goto fail;
+        }
+
     } else if (available < eac3_header.m_FrameSize || (m_Bits.m_Flags & AP4_BITSTREAM_FLAG_EOS) == 0) {
         // not enough for a frame, or not at the end (in which case we'll want to peek at the next header)
         return AP4_ERROR_NOT_ENOUGH_DATA;

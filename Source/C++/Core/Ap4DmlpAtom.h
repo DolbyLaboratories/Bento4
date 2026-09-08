@@ -2,7 +2,7 @@
 |
 |    AP4 - dmlp Atoms
 |
-|    Copyright 2002-2018 Axiomatic Systems, LLC
+|    Copyright 2002-2019 Axiomatic Systems, LLC
 |
 |
 |    This file is part of Bento4/AP4 (MP4 Atom Processing Library).
@@ -33,7 +33,11 @@
 |   includes
 +---------------------------------------------------------------------*/
 #include "Ap4Atom.h"
-#include "Ap4Utils.h"
+#include "Ap4Array.h"
+
+/*----------------------------------------------------------------------
+|   constants
++---------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------
 |   AP4_DmlpAtom
@@ -42,24 +46,38 @@ class AP4_DmlpAtom : public AP4_Atom
 {
 public:
     AP4_IMPLEMENT_DYNAMIC_CAST_D(AP4_DmlpAtom, AP4_Atom)
-    
+
+    // types
+    struct StreamInfo {
+        unsigned int format_info;
+        unsigned int peak_data_rate;
+    };
+
     // class methods
     static AP4_DmlpAtom* Create(AP4_Size size, AP4_ByteStream& stream);
-    
+
     // constructors
     AP4_DmlpAtom(const AP4_DmlpAtom& other);
-    AP4_DmlpAtom(AP4_UI32 format_info, AP4_UI16 peak_data_rate);
+    AP4_DmlpAtom(AP4_UI32 size, const StreamInfo* StreamInfo);  // DSI vaiable initialize m_RawBytes (SpecificBoxInfo -> m_RawBytes)
 
-    // methods
+                                                 // methods
     virtual AP4_Result InspectFields(AP4_AtomInspector& inspector);
     virtual AP4_Result WriteFields(AP4_ByteStream& stream);
-    
-    // helpers
-    void GetCodecString(AP4_String& codec);
-    
+    virtual AP4_Atom* Clone() { return new AP4_DmlpAtom(m_Size32, m_RawBytes.GetData()); }
+    virtual AP4_DmlpAtom* CloneConst() const { return new AP4_DmlpAtom(m_Size32, m_RawBytes.GetData()); }
+
+    // accessors
+    const AP4_DataBuffer& GetRawBytes()   const { return m_RawBytes; }
+    const StreamInfo&     GetStreamInfo() const { return m_StreamInfo; }
+
+private:
+    // methods
+    AP4_DmlpAtom(AP4_UI32 size, const AP4_UI08* payload);  // box data initialize m_Dsi (m_RawBytes -> SpecificBoxInfo)
+
     // members
-    AP4_UI32 m_FormatInfo;
-    AP4_UI16 m_PeakDataRate;
+    AP4_DataBuffer m_RawBytes;
+    StreamInfo     m_StreamInfo;
+
 };
 
 #endif // _AP4_DMLP_ATOM_H_

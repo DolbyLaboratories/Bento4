@@ -83,7 +83,8 @@ for i in range(4):
         t = i + 1
         while AA[t][i] == 0 and t < 4:
             t += 1
-            assert t != 4, 'G matrix must be invertible'
+            if t == 4:
+                raise ValueError('G matrix must be invertible')
             for j in range(8):
                 AA[i][j], AA[t][j] = AA[t][j], AA[i][j]
             pivot = AA[i][i]

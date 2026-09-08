@@ -6,16 +6,20 @@ __copyright__ = 'Copyright 2011-2020 Axiomatic Systems, LLC.'
 
 import sys
 import os
+import copy
 import os.path as path
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError # nosec B404
 import json
 import io
 import struct
 import operator
 import hashlib
 import fractions
-import xml.sax.saxutils as saxutils
+import xml.sax.saxutils as saxutils # nosec B406
 import base64
+import math
+
+BENTO4_UTILS_VERSION = "2.0.0"
 
 LanguageCodeMap = {
     'aar': 'aa', 'abk': 'ab', 'afr': 'af', 'aka': 'ak', 'alb': 'sq', 'amh': 'am', 'ara': 'ar', 'arg': 'an',
@@ -249,11 +253,6 @@ def XmlDuration(d):
         xsd += ('%.3fS' % (s))
     return xsd
 
-def BooleanFromString(string):
-    if string is None:
-        return False
-    return string.lower() in ['yes', 'true', 'on', '1']
-
 def Base64Encode(x):
     return base64.b64encode(x).decode('ascii')
 
@@ -281,12 +280,12 @@ def Bento4Command(options, name, *args, **kwargs):
         print('COMMAND: ', " ".join(cmd), cmd)
     try:
         try:
-            return check_output(cmd)
+            return check_output(cmd) # nosec B603
         except OSError as e:
             if options.debug:
                 print('executable ' + executable + ' not found in exec_dir, trying with PATH')
             cmd[0] = path.basename(cmd[0])
-            return check_output(cmd)
+            return check_output(cmd) # nosec B603
     except CalledProcessError as e:
         message = "binary tool failed with error %d" % e.returncode
         if options.verbose:
@@ -303,6 +302,7 @@ def Mp4Dump(options, filename, *args, **kwargs):
     return Bento4Command(options, 'mp4dump', filename, *args, **kwargs)
 
 def Mp4Split(options, filename, *args, **kwargs):
+    # print args
     return Bento4Command(options, 'mp4split', filename, *args, **kwargs)
 
 def Mp4Fragment(options, input_filename, output_filename, *args, **kwargs):
@@ -316,6 +316,12 @@ def Mp42Hls(options, input_filename, *args, **kwargs):
 
 def Mp4IframeIndex(options, input_filename, *args, **kwargs):
     return Bento4Command(options, 'mp4iframeindex', input_filename, *args, **kwargs)
+
+def Mp4Edit(options, input_filename, output_filename, *args, **kwargs):
+    return Bento4Command(options, 'mp4edit', input_filename, output_filename, *args, **kwargs)
+
+def Mp4Extract(options, atom_path, input_filename, output_filename, *args, **kwargs):
+    return Bento4Command(options, 'mp4extract', atom_path, input_filename, output_filename, *args, **kwargs)
 
 class Mp4Atom:
     def __init__(self, type, size, position):
@@ -362,6 +368,110 @@ def FindChild(top, path):
         top = children[0]
     return top
 
+def Ac4ChannelCountFromMask(speaker_group_index_mask):
+    channel_count = 0
+    if (speaker_group_index_mask & 1) != 0:      # 0: L,R
+        channel_count += 2
+    if (speaker_group_index_mask & 2) != 0:      # 1: C
+        channel_count += 1
+    if (speaker_group_index_mask & 4) != 0:      # 2: Ls,Rs
+        channel_count += 2
+    if (speaker_group_index_mask & 8) != 0:      # 3: Lb,Rb
+        channel_count += 2
+    if (speaker_group_index_mask & 16) != 0:     # 4: Tfl,Tfr
+        channel_count += 2
+    if (speaker_group_index_mask & 32) != 0:     # 5: Tbl,Tbr
+        channel_count += 2
+    if (speaker_group_index_mask & 64) != 0:     # 6: LFE
+        channel_count += 1
+    if (speaker_group_index_mask & 128) != 0:    # 7: TL,TR
+        channel_count += 2
+    if (speaker_group_index_mask & 256) != 0:    # 8: Tsl,Tsr
+        channel_count += 2
+    if (speaker_group_index_mask & 512) != 0:    # 9: Tfc
+        channel_count += 1
+    if (speaker_group_index_mask & 1024) != 0:   # 10: Tbc
+        channel_count += 1
+    if (speaker_group_index_mask & 2048) != 0:   # 11: Tc
+        channel_count += 1
+    if (speaker_group_index_mask & 4096) != 0:   # 12: LFE2
+        channel_count += 1
+    if (speaker_group_index_mask & 8192) != 0:   # 13: Bfl,Bfr
+        channel_count += 2
+    if (speaker_group_index_mask & 16384) != 0:  # 14: Bfc
+        channel_count += 1
+    if (speaker_group_index_mask & 32768) != 0:  # 15: Cb
+        channel_count += 1
+    if (speaker_group_index_mask & 65536) != 0:  # 16: Lscr,Rscr
+        channel_count += 2
+    if (speaker_group_index_mask & 131072) != 0: # 17: Lw,Rw
+        channel_count += 2
+    if (speaker_group_index_mask & 262144) != 0: # 18: Vhl,Vhr
+        channel_count += 2
+    if (speaker_group_index_mask & 1) != 0 and (speaker_group_index_mask & 2) != 0 and channel_count == 3:
+        channel_count = 2
+    return channel_count
+
+# Represents 'labl' atom
+class Label:
+    def __init__(self, atom):
+        self.is_group_label = atom['is_group_label']
+        self.label_id       = atom['label_id']
+        self.language       = atom['language']
+        self.label          = atom['label']
+
+# Represents 'kind' atom
+class Kind:
+    def __init__(self, atom):
+        self.schemeURI  = atom['scheme_uri']
+        self.value      = atom['value'] if 'value' in atom else None
+
+# Represents 'ardi' atom, including descriptions
+# TODO: could be just a string instead of a class / object
+class AudioRenderingIndication:
+    def __init__(self, atom):
+        self.audio_rendering_indication  = atom['audio_rendering_indication']
+        self.description = []
+        self.description.append('no preference given for the reproduction channel layout') # 0
+        self.description.append('preferred reproduction channel layout is stereo') # 1
+        self.description.append('preferred reproduction channel layout is two-dimensional (e.g. 5.1 multi-channel)') # 2
+        self.description.append('preferred reproduction channel layout is three-dimensional') # 3
+        self.description.append('content is pre-rendered for consumption with headphones') # 4
+
+# Represents 'moov'->'meta'->'grpl'->'prsl' atom and its children
+class Preselection:
+    def __init__(self, atom):
+        self.group_id                       = atom['group_id'] # superfluous?
+        self.num_entities_in_group          = atom['num_entities_in_group'] # superfluous?
+        self.entities_in_group              = [] # Array of entity_id
+        for entity in atom['entities_in_group']:
+            self.entities_in_group.append(entity['entity_id'])
+        if 'preselection_tag' in atom:
+            self.tag        = atom['preselection_tag']
+        if 'selection_priority' in atom:
+            self.selection_priority     = atom['selection_priority']
+        if 'interleaving_tag' in atom:
+            self.interleaving_tag = atom['interleaving_tag']
+        self.labels                         = [] # Array of 'labl' atoms
+        self.audio_rendering_indications    = [] # Array of 0 or 1 'ardi' atoms
+        self.kinds                          = [] # Array of 'kind' atoms
+        self.extended_language              = ''
+        #self.channel_layout                 = [] # Array of 0 or 1 'chnl' atoms
+
+        for c in atom['children']:
+            if c['name'] == 'labl':
+                self.labels.append(Label(c))
+            elif c['name'] == 'elng':
+                self.extended_language = c['extended_language']
+            elif c['name'] == 'kind':
+                self.kinds.append(Kind(c))
+            elif c['name'] == 'ardi':
+                self.audio_rendering_indications.append(AudioRenderingIndication(c))
+            elif c['name'] == 'udta':
+                for uc in c['children']:
+                    if uc['name'] == 'diap':
+                        self.dialog_gain = int(uc['dialog_gain'])
+
 class Mp4Track:
     def __init__(self, parent, info):
         self.parent                   = parent
@@ -404,6 +514,11 @@ class Mp4Track:
         else:
             self.codec = self.codec_family
 
+        #update total sample count and total duration if exit
+        self.total_sample_count = info['media']['sample_count']
+        self.total_duration = info['media']['duration']
+        self.total_scaled_duration = info['media']['duration_ms']/1000
+
         if self.type == 'video':
             # set the scan type (hardcoded for now)
             self.scan_type = 'progressive'
@@ -412,24 +527,32 @@ class Mp4Track:
             # set the width and height
             self.width  = sample_desc['width']
             self.height = sample_desc['height']
+            self.par = str(fractions.Fraction(self.width, self.height)).replace('/', ':')
 
             # add dolby vision signaling if present; otherwise detect HDR10/HLG
             if 'dolby_vision' in sample_desc:
                 dv_info = sample_desc['dolby_vision']
+                self.dv_codec_family = ''
+                for dv_codec in ['dva1', 'dvav', 'dvh1', 'dvhe']:
+                    if dv_codec in self.codec:
+                        self.dv_codec_family = dv_codec
                 if dv_info['profile'] == 5:
                     self.video_range = 'PQ'
-                elif dv_info['profile'] in [8, 9]:
-                    self.supplemental_codec = sample_desc['dv_codecs_string'].split(",")[1].split(".")[0] + \
-                        "." + sample_desc['dv_codecs_string'].split(",")[1].split(".")[1] + str('.%02d' % dv_info['level'])
+                elif dv_info['profile'] in [8, 9, 20]:
+                    self.dv_codec = self.codec.split(",")[0]
                     bl_compatibility_id = dv_info['dv_bl_signal_compatibility_id']
+                    if bl_compatibility_id != 0:
+                        self.supplemental_codec = self.codec.split(",")[1].split(".")[0] + \
+                            "." + self.codec.split(",")[1].split(".")[1] + str('.%02d' % dv_info['level'])
                     if bl_compatibility_id == 1:
                         self.video_range = 'PQ'
                         brand = 'db1p'
                         if brand in self.parent.info['file']['compatible_brands']:
                             self.dv_brand = brand
                         else:
-                            print('WARNING: missing brand "db1p" in MP4 file for Dolby Vision Profile 8.1.')
+                            print('WARNING: missing brand "db1p" in MP4 file for Dolby Vision track.')
                         self.supplemental_profile = brand
+                        self.segment_profile = 'chd1'
                         self.transfer_characteristics = '16'
                         self.matrix_coefficients = '9'
                         self.colour_primaries = '9'
@@ -438,25 +561,37 @@ class Mp4Track:
                         brand = 'db2g'
                         if brand in self.parent.info['file']['compatible_brands']:
                             self.dv_brand = brand
+                        else:
+                            print('WARNING: missing brand "db2g" in MP4 file for Dolby Vision track')
                         self.supplemental_profile = brand
+                        self.transfer_characteristics = '1'
+                        self.matrix_coefficients = '1'
+                        self.colour_primaries = '1'
                     elif bl_compatibility_id == 4:
                         self.video_range = 'HLG'
                         self.matrix_coefficients = '9'
                         self.colour_primaries = '9'
+                        self.segment_profile = 'clg1'
+                        # set default format as 'db4h' if brand is missing in MP4
+                        self.supplemental_profile = 'db4h'
+                        self.transfer_characteristics = '18'
                         if 'db4g' in self.parent.info['file']['compatible_brands']:
                             brand = 'db4g'
                             self.dv_brand = brand
                             self.supplemental_profile = brand
                             self.transfer_characteristics = '14'
-                        else:
+                        elif 'db4h' in self.parent.info['file']['compatible_brands']:
                             brand = 'db4h'
                             self.dv_brand = brand
                             self.supplemental_profile = brand
                             self.transfer_characteristics = '18'
-                            if 'db4h' not in self.parent.info['file']['compatible_brands']:
-                                print('WARNING: missing brand "db4g" or "db4h" in MP4 file for Dolby Vision Profile 8.4. Will use "db4h" as default.')
-                    else:
-                        PrintErrorAndExit('ERROR: unsupported ccid for Dolby Vision profile 8/9.')
+                        else:
+                            print('WARNING: missing brand "db4g" or "db4h" in MP4 file for Dolby Vision track. Will use "db4h" as default.')
+                    elif bl_compatibility_id == 0:
+                        if dv_info['profile'] in [10, 20]:
+                            self.video_range = 'PQ'
+                        else:
+                            PrintErrorAndExit('ERROR: unsupported ccid.')
                 else:
                     PrintErrorAndExit('ERROR: unsupported Dolby Vision profile.')
             elif 'color_info' in sample_desc:
@@ -479,14 +614,16 @@ class Mp4Track:
             self.dolby_ddp_atmos = 'No'
             self.dolby_ac4_ims   = 'No'
             self.dolby_ac4_cbi   = 'No'
+            self.dolby_ac4_ajoc = 'No'
+            self.self_contained  = 'Yes'
+            # Completed main and associated audio flags
+            self.CM              = 'CMNA'
+            self.AA              = 'AANA'
             if self.codec_family == 'ec-3' and 'dolby_digital_plus_info' in sample_desc:
-                self.channels = GetDolbyDigitalPlusChannels(self)[0]
-                self.dolby_ddp_atmos = sample_desc['dolby_digital_plus_info']['Dolby_Atmos']
+                self.dolby_ddp_atmos = sample_desc['dolby_digital_plus_info']['atmos']
                 if (self.dolby_ddp_atmos == 'Yes'):
                     self.complexity_index = sample_desc['dolby_digital_plus_info']['complexity_index']
-                    self.channels =  str(self.info['sample_descriptions'][0]['dolby_digital_plus_info']['complexity_index']) + '/JOC'
             elif self.codec_family == 'ac-4' and 'dolby_ac4_info' in sample_desc:
-                self.channels = str(self.channels)
                 if sample_desc['dolby_ac4_info']['dsi version'] == 0:
                     raise Exception("AC4 dsi version 0 is deprecated.")
                 elif sample_desc['dolby_ac4_info']['dsi version'] == 1:
@@ -496,27 +633,42 @@ class Mp4Track:
                         stream_type = sample_desc['dolby_ac4_info']['presentations'][0]['Stream Type']
                         if stream_type == 'Immersive stereo':
                             self.dolby_ac4_ims = 'Yes'
-                            self.channels = '2/IMSA'
                         elif stream_type == 'Channel based immsersive':
                             self.dolby_ac4_cbi = 'Yes'
-                            self.channels = self.channels + '/IMSA'
-            elif 'mpeg_4_audio_decoder_config' in sample_desc:
+                            # Calculate number of channels from presentation_channel_mask_v1
+                            self.channels = Ac4ChannelCountFromMask(sample_desc['dolby_ac4_info']['presentations'][0]['presentation_channel_mask_v1'])
+                        elif stream_type == 'Object based':
+                            if 'Objects number' in sample_desc['dolby_ac4_info']['presentations'][0]:
+                                self.dolby_ac4_ajoc= 'Yes'
+                                self.channels=sample_desc['dolby_ac4_info']['presentations'][0]['Objects number']
+                        elif stream_type == 'Channel based':
+                            # Calculate number of channels from presentation_channel_mask_v1
+                            self.channels = Ac4ChannelCountFromMask(sample_desc['dolby_ac4_info']['presentations'][0]['presentation_channel_mask_v1'])
+
+                    self.self_contained = sample_desc['dolby_ac4_info']['Self Contained']
+            elif self.codec_family == 'mp4a' and 'mpeg_4_audio_decoder_config' in sample_desc:
                 adc = sample_desc['mpeg_4_audio_decoder_config']
                 self.channels = adc['channels']
                 # For HE-AAC/SBR, use the output sample rate signaled in the extension config.
                 if 'sampling_frequency' in adc:
                     self.sample_rate = adc['sampling_frequency']
 
+            if 'CM' in self.parent.media_source.spec:
+                self.CM = self.parent.media_source.spec['CM']
+            if 'AA' in self.parent.media_source.spec:
+                self.AA = self.parent.media_source.spec['AA']
+
         self.language = info['language']
         self.language_name = LanguageNames.get(LanguageCodeMap.get(self.language, 'und'), '')
 
     def update(self, options):
         # compute the total number of samples
-        self.total_sample_count = reduce(operator.add, self.sample_counts, 0)
-
-        # compute the total duration
-        self.total_duration = reduce(operator.add, self.segment_durations, 0)
-        self.total_scaled_duration = reduce(operator.add, self.segment_scaled_durations, 0)
+        if len(self.sample_counts) > 0 and self.total_sample_count == 0:
+            self.total_sample_count = reduce(operator.add, self.sample_counts, 0)
+    
+            # compute the total duration
+            self.total_duration = reduce(operator.add, self.segment_durations, 0)
+            self.total_scaled_duration = reduce(operator.add, self.segment_scaled_durations, 0)
 
         # compute the average segment durations
         segment_count = len(self.segment_durations)
@@ -535,7 +687,23 @@ class Mp4Track:
 
         # compute the max segment bitrates
         if len(self.segment_bitrates) > 1:
-            self.max_segment_bitrate = max(self.segment_bitrates[:-1])
+            # Per HLS spec: peak bitrate = largest bitrate of any contiguous set of segments
+            # whose total duration is between 0.5 and 1.5 times the target duration.
+            # The bitrate of a set = sum(sizes) / sum(durations).
+            target_duration = math.ceil(max(self.segment_durations))
+            self.max_segment_bitrate = 0
+            for i in range(len(self.segment_durations)):
+                total_size = 0
+                total_duration = 0
+                for j in range(i, len(self.segment_durations)):
+                    total_size += self.segment_sizes[j]
+                    total_duration += self.segment_durations[j]
+                    if total_duration > 1.5 * target_duration:
+                        break
+                    if total_duration >= 0.5 * target_duration:
+                        bitrate = 8.0 * total_size / total_duration
+                        if bitrate > self.max_segment_bitrate:
+                            self.max_segment_bitrate = bitrate
         else:
             self.max_segment_bitrate = self.average_segment_bitrate
 
@@ -548,7 +716,10 @@ class Mp4Track:
             # compute the frame rate
             if self.total_duration:
                 self.frame_rate = self.total_sample_count / self.total_duration
-                self.frame_rate_ratio = str(fractions.Fraction(str(self.frame_rate)).limit_denominator(100000))
+                if format(self.frame_rate, '.3f') == '23.976':
+                    self.frame_rate_ratio = '24000/1001'
+                else:
+                    self.frame_rate_ratio = str(fractions.Fraction(str(self.frame_rate)).limit_denominator(100000))
             else:
                 self.frame_rate = 0.0
                 self.frame_rate_ratio = "0"
@@ -574,6 +745,7 @@ class Mp4File:
         self.media_source    = media_source
         self.info            = media_source.mp4_info
         self.tracks          = {}
+        self.preselections   = {}
         self.file_list_index = 0 # used to keep a sequence number just amongst all sources
 
         filename = media_source.filename
@@ -583,7 +755,7 @@ class Mp4File:
         # by default, the media name is the basename of the source file
         self.media_name = path.basename(filename)
 
-        # walk the atom structure
+        # walk the top level atom structure, retrieve type and size only from binary file
         self.atoms = WalkAtoms(filename)
         self.segments = []
         for atom in self.atoms:
@@ -601,7 +773,7 @@ class Mp4File:
         for track in self.info['tracks']:
             self.tracks[track['id']] = Mp4Track(self, track)
 
-        # get a complete file dump
+        # get a complete file dump as JSON
         json_dump = Mp4Dump(options, filename, format='json', verbosity='1')
         self.tree = json.loads(json_dump, strict=False, object_pairs_hook=collections.OrderedDict)
 
@@ -609,7 +781,7 @@ class Mp4File:
         for track in self.tracks.values():
             track.compute_kid()
 
-        # compute default sample durations and timescales
+        # compute default sample durations and timescales, and retrieve preselections
         for atom in self.tree:
             if atom['name'] == 'moov':
                 for c1 in atom['children']:
@@ -627,7 +799,40 @@ class Mp4File:
                                 for c3 in c2['children']:
                                     if c3['name'] == 'mdhd':
                                         self.tracks[track_id].timescale = c3['timescale']
+            if atom['name'] == 'meta':
+                for c1 in atom['children']:
+                    if c1['name'] == 'grpl':
+                        for c2 in c1['children']:
+                            if c2['name'] == 'prsl':
+                                self.preselections[c2['group_id']] = Preselection(c2)
 
+        # debug: show retrieved preselections
+        if options.debug:
+            for preselection in self.preselections:
+                print('Preselection group_id = ', preselection)
+                print('num_entities_in_group = ', self.preselections[preselection].num_entities_in_group)
+                for entity_id in self.preselections[preselection].entities_in_group:
+                    print('entity_id = ', entity_id)
+
+                for att in ['num_entities_in_group', 'entities_in_group', 'tag', 'selection_priority', 'interleaving_tag', 'extended_language']:
+                    if hasattr(self.preselections[preselection], att):
+                        print(att + ' = ', getattr(self.preselections[preselection], att))
+
+                for label in self.preselections[preselection].labels:
+                    print('Label')
+                    print('label_id = ', label.label_id)
+                    print('is_group_label = ', label.is_group_label)
+                    print('language = "' + label.language + '"')
+                    print('label = "' + label.label + '"')
+                for kind in self.preselections[preselection].kinds:
+                    print('Kind')
+                    print('schemeURI = "' + kind.schemeURI + '"')
+                    print('value = "' + kind.value + '"')
+                for ardi in self.preselections[preselection].audio_rendering_indications:
+                    print('AudioRenderingIndication')
+                    print('schemeURI = ', ardi.audio_rendering_indication)
+                    print('schemeURI meaning: "' + ardi.description[ardi.audio_rendering_indication] + '"')
+                print('--------------------')
         # partition the segments
         segment_index = 0
         track = None
@@ -721,6 +926,10 @@ class Mp4File:
                 print('    Max segment bitrate      =', track.max_segment_bitrate)
                 print('    Required bandwidth       =', int(track.bandwidth))
                 print('    Average segment duration =', track.average_segment_duration)
+                if track.type == 'video':
+                    print('    Frame rate               =', track.frame_rate)
+                elif track.type == 'audio':
+                    print('    Sample rate              =', track.sample_rate)
 
     def find_track_by_id(self, track_id_to_find):
         for track_id in self.tracks:
@@ -1005,7 +1214,7 @@ def ComputeDolbyAc4AudioChannelConfig(track):
         if 'presentations' in dolby_ac4_info and dolby_ac4_info['presentations']:
             presentation = dolby_ac4_info['presentations'][0]
             if 'presentation_channel_mask_v1' in presentation:
-                return '%06x' % presentation['presentation_channel_mask_v1']
+                return ('%06x' % presentation['presentation_channel_mask_v1']).upper()
 
     return '000000'
 
@@ -1024,16 +1233,133 @@ def DolbyAc4WithMPEGDASHScheme(mask):
     else:
         return (False, mask)
 
-def ReGroupEC3Sets(audio_sets):
+def DolbyVisionDualEntry(video_sets, codec, dv_codec):
+    duplicate_video_sets = []
+    for key in list(video_sets.keys()):
+        if ('video', codec, dv_codec) == key[:3]:
+            videos = video_sets[key]
+            for item_video in videos:
+                bl_compatibility_id = item_video.info['sample_descriptions'][0]['dolby_vision']['dv_bl_signal_compatibility_id']
+                codecs = item_video.codec.split(',')
+                remove_codec = ''
+                for item_codec in codecs:
+                    # only Dolby Vision profile 8.2/9.2 use dual entry
+                    if (item_codec[0:7] == dv_codec+'.08' or item_codec[0:7] == dv_codec+'.09') and bl_compatibility_id == 2:
+                        # duplicate the video track
+                        duplicate_video       = copy.deepcopy(item_video)
+                        duplicate_video.codec = item_codec
+                        duplicate_video.codec_family = item_codec[0:4]
+                        duplicate_video_sets.append(duplicate_video)
+                        # record the removed codec
+                        remove_codec = item_codec
+                # remove the Dolby codec string from the original video track
+                if remove_codec != '':
+                    codecs.remove(remove_codec)
+                    item_video.codec = ','.join(codecs)
+    if (duplicate_video_sets):
+        new_codec = dv_codec
+        video_sets[('video', new_codec)] = []
+        for item in duplicate_video_sets:
+            video_sets[('video', new_codec)].append(item)
+
+def PickVideoTrack(video_sets, codec, len,  new_video_sets):
+    for item in video_sets:
+        if item[0].codec[0:len] == codec:
+            new_video_sets.append(item)
+            # break
+
+# Handle duplicated video track for Dolby Vision profile 8 and 9 for video order, separate function in case for future changes
+def ReGroupVideoSetsHLS(video_sets):
+    new_video_sets = []
+    PickVideoTrack(video_sets, 'avc1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'avc3', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dva1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvav', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'hev1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvhe', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'hvc1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvh1', 4, new_video_sets)
+    return  new_video_sets
+
+# Handle duplicated video track for Dolby Vision profile 8 and 9 for video order, separate function in case for future changes
+def ReGroupVideoSetsDASH(video_sets):
+    new_video_sets = []
+    PickVideoTrack(video_sets, 'avc1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'avc3', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dva1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvav', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvhe', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'hev1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'dvh1', 4, new_video_sets)
+    PickVideoTrack(video_sets, 'hvc1', 4, new_video_sets)
+    return  new_video_sets       
+
+def NextExpectedOrderIndex(cur_idx, ordered_tracks):
+    expected_idx = cur_idx + 1
+    search = True
+    all_exiting_idxs = []
+    for tracks in ordered_tracks:
+        for item in tracks:
+            # there is no same input order
+            all_exiting_idxs.append(item.input_order)
+    while search:
+        if expected_idx in all_exiting_idxs:
+            expected_idx += 1
+        else:
+            break
+    return expected_idx
+
+def GetDuplicatedTrackIndex(media_tracks, search_input_order):
+    for tracks in media_tracks:
+        for item in tracks:
+            if (item.input_order == search_input_order):
+                return media_tracks.index(tracks)
+    return -1
+
+def ReOrderMediaTrack(media_tracks):
+    ordered_media_tracks = []
+    expected_order_idx   = 1
+    for _idx in range(len(media_tracks)):
+        for tracks in media_tracks:
+            if expected_order_idx == tracks[0].input_order:
+                ordered_media_tracks.append(tracks)
+                expected_order_idx  = NextExpectedOrderIndex(expected_order_idx, ordered_media_tracks)
+                break
+    # handle the duplicated video track for Dolby Vision profile 8
+    if len(media_tracks) != len(ordered_media_tracks):
+        for tracks in media_tracks:
+            if tracks not in ordered_media_tracks:
+                insert_idx = GetDuplicatedTrackIndex(ordered_media_tracks, tracks[0].input_order)
+                ordered_media_tracks.insert(insert_idx, tracks)
+
+    return ordered_media_tracks
+
+def ReGroupAC4andEC3Sets(audio_sets):
     regroup_audio_sets    = {}
     audio_adaptation_sets = {}
+    sc_index = 1
     for name, audio_tracks in audio_sets.items():
-        if audio_tracks[0].codec_family == 'ec-3':
+        if audio_tracks[0].codec_family == 'ac-4':
             for track in audio_tracks:
-                if track.info['sample_descriptions'][0]['dolby_digital_plus_info']['Dolby_Atmos'] == 'Yes':
+                if len(track.info['sample_descriptions'][0]['dolby_ac4_info']['presentations']) > 1:
+                    adaptation_set_name = ('audio', track.language, track.codec_family, track.channels, 'multi-presentation')
+                else:
+                    adaptation_set_name = ('audio', track.language, track.codec_family, track.channels)
+                if track.self_contained != 'Yes':
+                    adaptation_set_name = adaptation_set_name + ('#sc' + str(sc_index),)
+                    sc_index += 1
+                adaptation_set = audio_adaptation_sets.get(adaptation_set_name, [])
+                audio_adaptation_sets[adaptation_set_name] = adaptation_set
+                adaptation_set.append(track) 
+        elif audio_tracks[0].codec_family == 'ec-3':
+            for track in audio_tracks:
+                if track.info['sample_descriptions'][0]['dolby_digital_plus_info']['atmos'] == 'Yes':
                     adaptation_set_name = ('audio', track.language, track.codec_family, track.channels, 'ATMOS')
                 else:
                     adaptation_set_name = ('audio', track.language, track.codec_family, track.channels)
+                if track.self_contained != 'Yes':
+                    adaptation_set_name = adaptation_set_name + ('#sc' + str(sc_index),)
+                    sc_index += 1
                 adaptation_set = audio_adaptation_sets.get(adaptation_set_name, [])
                 audio_adaptation_sets[adaptation_set_name] = adaptation_set
                 adaptation_set.append(track)
@@ -1045,11 +1371,126 @@ def ReGroupEC3Sets(audio_sets):
 
     return regroup_audio_sets
 
+def ReGroupAudioSets(audio_sets):
+    audio_group_sets = {}
+    for audio_tracks in audio_sets.values():
+        for track in audio_tracks:
+            if track.codec_family == 'ec-3' or track.codec_family == 'ac-3':
+                track.channels = GetDolbyDigitalPlusChannels(track)[0]
+                if track.dolby_ddp_atmos == 'Yes':
+                    track.channels =  str(track.info['sample_descriptions'][0]['dolby_digital_plus_info']['complexity_index']) + '/JOC'
+            if track.codec_family == 'ac-4':
+                if track.dolby_ac4_ims == 'Yes':
+                    track.channels = '2/IMSA'
+                elif track.dolby_ac4_cbi == 'Yes':
+                    track.channels = str(track.channels) + '/IMSA'
+                elif track.dolby_ac4_ajoc == 'Yes':
+                    track.channels = str(track.channels) + '/JOC'
+
+            group_set_name  = ('audio', track.codec_family, track.channels)
+            group_set_value = audio_group_sets.get(group_set_name, [])
+            audio_group_sets[group_set_name] = group_set_value
+            group_set_value.append(track)
+    return audio_group_sets
+
+def NeedReGroupDlbAudioSets(audio_sets):
+    b_CM = False
+    b_AA = False
+    for name, audio_tracks in audio_sets.items():
+        if name[2] == 'ec-3' or name[2] == 'ac-4':
+            for track in audio_tracks:
+                if 'CM' in track.parent.media_source.spec:
+                    b_CM = True
+                if 'AA' in track.parent.media_source.spec:
+                    b_AA = True
+    if b_CM and b_AA:
+        return True
+    else:
+        return False
+
+# CM + AA use case
+def ReGroupDlbAudioSets(audio_sets):
+    regroup_audio_sets    = {}
+    audio_adaptation_sets = {}
+    for name, audio_tracks in audio_sets.items():
+        if audio_tracks[0].codec_family == 'ec-3' or audio_tracks[0].codec_family == 'ac-4':
+            for track in audio_tracks:
+                adaptation_set_name = ('audio', track.language, track.codec_family)
+                if 'AA' in track.parent.media_source.spec:
+                    adaptation_set_name = adaptation_set_name + ('AA#' + str(track.parent.media_source.spec['AA']),)
+                adaptation_set = audio_adaptation_sets.get(adaptation_set_name, [])
+                audio_adaptation_sets[adaptation_set_name] = adaptation_set
+                adaptation_set.append(track) 
+        else:
+            regroup_audio_sets[name] = audio_tracks
+
+    for name, ddp_tracks in audio_adaptation_sets.items():
+        regroup_audio_sets[name] = ddp_tracks
+
+    return regroup_audio_sets
+
+def FindDependencyId(audio_tracks, AA_id):
+    for tracks in audio_tracks:
+        for track in tracks:
+            if AA_id == track.CM:
+                return track.representation_id
+    return -1
+
+def GenVideoSets(video_tracks):
+    video_sets = {}
+    for track in video_tracks:
+        sets_name  = ('video', track.codec_family)
+        sets_value = video_sets.get(sets_name, [])
+        video_sets[sets_name] = sets_value
+        sets_value.append(track)
+    return video_sets
+
+def OrderedByInputOrder(track):
+    return track.input_order
+
+def ReOrderAudioSetsInternally(audio_sets):
+    for tracks in audio_sets.values():
+        tracks.sort(key = OrderedByInputOrder)
+    return audio_sets
+
+def PrintBlankLine(group_tracks):
+    for tracks in group_tracks:
+        if len(tracks) > 1:
+            return True
+    return False
+
+def FindAudioGroups(expected_order_idx, audio_groups):
+    for name, value in audio_groups.items():
+        if value['group_order'] == expected_order_idx:
+            return name
+    return 'no_audio_group'
+
+def ContainDolbyVision(video_tracks):
+    for track in video_tracks:
+        if type(track) is dict:
+            if not 'video' in track['info']: continue
+            codecs = track['info']['video']['codec'].split(',')
+        elif type(track) is Mp4Track:
+            if 'Video' not in track.info['type']: continue
+            codecs = track.codec.split(',')
+        for codec in codecs:
+            if codec.split('.')[0] in ['dvh1', 'dvhe', 'dvav', 'dva1']:
+                return True
+    return False
+
+def ContainAtmosAndAC4(audio_sets):
+    for audio_tracks in audio_sets:
+        if audio_tracks[0].codec_family in ['ac-4']:
+            return  True
+        if audio_tracks[0].codec_family in ['ec-3'] and audio_tracks[0].dolby_ddp_atmos == 'Yes':
+            return True
+    return False
+
 def ComputeDolbyDigitalPlusAudioChannelMask(track):
     masks = {
         'L':       0x1,             # SPEAKER_FRONT_LEFT
         'R':       0x2,             # SPEAKER_FRONT_RIGHT
-        'C':	   0x4,             # SPEAKER_FRONT_CENTER
+        'C':       0x4,             # SPEAKER_FRONT_CENTER
         'LFE':     0x8,             # SPEAKER_LOW_FREQUENCY
         'Ls':      0x10,            # SPEAKER_BACK_LEFT
         'Rs':      0x20,            # SPEAKER_BACK_RIGHT
@@ -1083,7 +1524,8 @@ def ComputeDolbyDigitalPlusSmoothStreamingInfo(track):
     mask_hex_be = "{0:0{1}x}".format(channel_mask, 4)
     info += mask_hex_be[2:4]+mask_hex_be[0:2]+'0000'
     info += "af87fba7022dfb42a4d405cd93843bdd"
-    info += track.info['sample_descriptions'][0]['dolby_digital_plus_info']['dec3_payload']
+    if 'dolby_digital_plus_info' in track.info['sample_descriptions'][0]:
+        info += track.info['sample_descriptions'][0]['dolby_digital_plus_info']['dec3_payload']
     return (channel_count, info.lower())
 
 def ComputeMarlinPssh(options):
@@ -1329,6 +1771,9 @@ def ComputeWidevineHeader(header_spec, encryption_scheme, kid_hex):
     if 'policy' in fields:
         protobuf_fields.append((6, fields['policy']))
 
+    if encryption_scheme == 'cenc':
+        protobuf_fields.append((1, 1))
+
     four_cc = struct.unpack('>I', encryption_scheme.encode('ascii'))[0]
     protobuf_fields.append((9, four_cc))
 
@@ -1356,6 +1801,10 @@ __all__ = [
     'Mp4Track',
     'Mp4File',
     'MediaSource',
+    'Label',
+    'Kind',
+    'AudioRenderingIndication',
+    'Preselection',
     'ComputeBandwidth',
     'MakeNewDir',
     'MakePsshBox',
